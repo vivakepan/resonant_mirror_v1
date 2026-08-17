@@ -12,7 +12,7 @@ import {
   nextFigureZoom,
   pointHitsLarynx,
   pointHitsSkull,
-} from '../anatomy/anatomyRenderer.js?v=restore-1';
+} from '../anatomy/anatomyRenderer.js?v=breath-line-1';
 import { BreathKinematics, defaultBreathDemo, REST_POSE, VoiceSyncedBreath } from '../anatomy/breathKinematics.js';
 import {
   drawVocalFoldCloseup,
@@ -20,7 +20,7 @@ import {
   foldHudSummary,
   idleVocalFoldState,
   overlayTechniqueOnLive,
-} from '../anatomy/vocalFoldState.js?v=restore-1';
+} from '../anatomy/vocalFoldState.js?v=breath-line-1';
 import { renderInspectorHtml } from '../visualization/inspector.js';
 import { defaultFeatureFlags } from '../contracts/featureFlags.js';
 import { EVIDENCE_LABELS } from '../contracts/evidence.js';
@@ -33,7 +33,7 @@ import {
   nextSkullYaw,
   nextSkullZoom,
   skullCloseupState,
-} from '../anatomy/skullCloseup.js?v=restore-1';
+} from '../anatomy/skullCloseup.js?v=breath-line-1';
 import { mountPracticeInstruments } from './practiceUi.js';
 import { parseSongFilename } from '../lyrics/parseFilename.js';
 import { formatVowelSensationLine } from '../resonance/vowelMap.js';
@@ -143,6 +143,7 @@ bindToggle('auraLayer', 'aura');
 bindToggle('supportLayer', 'support');
 bindToggle('lanesLayer', 'lanes');
 
+const BREATH_VAGUS_LABEL = 'Breath + vagus + spine + head/brain + Heart';
 const breathVagusBtn = document.getElementById('breathVagusBtn');
 breathVagusBtn.addEventListener('click', () => {
   layers.vagus = !layers.vagus;
@@ -152,7 +153,7 @@ breathVagusBtn.addEventListener('click', () => {
     document.getElementById('breathLayer').checked = true;
   }
   breathVagusBtn.setAttribute('aria-pressed', String(layers.vagus));
-  breathVagusBtn.textContent = layers.vagus ? 'Breath + vagus · on' : 'Breath + vagus';
+  breathVagusBtn.textContent = layers.vagus ? `${BREATH_VAGUS_LABEL} · on` : BREATH_VAGUS_LABEL;
 });
 
 const labelBox = document.getElementById('selfLabels');
@@ -288,6 +289,7 @@ function frame(now) {
     demoBreath: idleDemo || referenceBreath,
     viewYawRadians: viewYaw,
     figureZoom,
+    features: voiceFrame?.features || {},
   });
   lastPlan = plan;
   drawAnatomyV2(ctx, W, H, plan);

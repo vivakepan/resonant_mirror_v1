@@ -7,6 +7,7 @@ import { resolveVisualState, createUnknownVisualState } from './mirrorState.js';
 import { simulatedAirflow } from '../respiration/estimator.js';
 import { snapshotPoseForClass } from '../anatomy/breathKinematics.js';
 import { defaultFeatureFlags } from '../contracts/featureFlags.js';
+import { registerGlowFromInference } from '../registration/estimator.js';
 
 export function composeVisualStates(frame, {
   flags = defaultFeatureFlags(),
@@ -173,9 +174,13 @@ export function composeVisualStates(frame, {
 }
 
 function registrationVisual(name, reg, matchClass, timestampSeconds, flag) {
-  const p = reg.probabilities?.[matchClass]
-    ?? (reg.class === matchClass ? (reg.confidence || 0) : 0);
-  const enabled = flag?.enabled && reg.class && reg.class !== 'unknown' && p > 0.18;
+  const glows = registerGlowFromInference(reg);
+  const key = matchClass === 'chest_dominant' ? 'chest'
+    : matchClass === 'head_dominant' ? 'head'
+      : matchClass === 'mixed' ? 'mixed'
+        : null;
+  const p = key ? glows[key] : 0;
+  const enabled = flag?.enabled && p > 0.18;
   if (!enabled) return createUnknownVisualState(name, timestampSeconds);
   return resolveVisualState({
     visualName: name,

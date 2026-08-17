@@ -27,19 +27,25 @@ import { breathPlumeScale, soundFieldAttenuation } from './soundField.js';
 export { breathPlumeScale, soundFieldAttenuation } from './soundField.js';
 import {
   AIRFLOW_RGB,
+  AIRWAY_COLUMN_RGB,
   BONE_RGB,
   CHEST_CHAMBER_RGB,
   CHEST_VOICE_RGB,
   HEAD_VOICE_RGB,
+  LARYNX_RGB,
   LUNG_RGB,
   MUSCLE_RGB,
   OUTLINE_RGB,
   SKULL_CHAMBER_RGB,
+  STRUCTURE_VIBRATION_RGB,
+  THROAT_CHAMBER_RGB,
   TRACT_RGB,
   registerVoiceAmounts,
   mixedSystemVibration,
+  structureVibrationFromVoice,
   rgbaVoice,
 } from './registerColors.js';
+import { inferHumming } from '../resonance/humming.js';
 
 export const FIGURE_ZOOM_RANGE = Object.freeze({ min: 0.48, max: 1.55 });
 
@@ -470,8 +476,11 @@ export function drawChestCloseup(ctx, W, H, plan = {}, { zoom = 1 } = {}) {
   drawSternum(ctx, L);
   drawDiaphragm(ctx, L);
   drawTrachea(ctx, L);
+  drawAirwayColumn(ctx, L, closePlan);
+  drawLarynx(ctx, L, closePlan);
   drawAirflow(ctx, L, closePlan);
   drawInternalResonance(ctx, L, closePlan);
+  drawStructureVibration(ctx, L, closePlan);
   drawChestCloseupStructureLabels(ctx, L);
   ctx.restore();
 
@@ -673,7 +682,7 @@ export function backgroundCurrentParticles(L, {
   direction = -1,
   flowRate = 0.48,
   phonated = false,
-  count = 96,
+  count = 360,
   frequencyHertz = 0,
 } = {}) {
   const W = L.W;
@@ -682,24 +691,42 @@ export function backgroundCurrentParticles(L, {
   const baseSpeed = 0.00022 * (0.5 + Math.max(0.18, flowRate));
   const speedMag = pitchLinkedSpeed(holding ? baseSpeed * 0.48 : baseSpeed, { phonated, frequencyHertz, timeMs });
   const streams = [
-    (t) => ({ x: W * 0.06 + Math.sin(t * Math.PI * 2) * W * 0.028, y: H * (0.98 - t * 0.94) }),
-    (t) => ({ x: W * 0.13 + Math.sin(t * Math.PI * 3 + 0.8) * W * 0.02, y: H * (0.94 - t * 0.88) }),
-    (t) => ({ x: W * 0.94 + Math.sin(t * Math.PI * 2 + 0.4) * W * 0.028, y: H * (0.98 - t * 0.94) }),
-    (t) => ({ x: W * 0.87 + Math.sin(t * Math.PI * 3 + 1.3) * W * 0.02, y: H * (0.94 - t * 0.88) }),
+    (t) => ({ x: W * 0.05 + Math.sin(t * Math.PI * 2) * W * 0.04, y: H * (0.98 - t * 0.94) }),
+    (t) => ({ x: W * 0.14 + Math.sin(t * Math.PI * 3 + 0.8) * W * 0.035, y: H * (0.94 - t * 0.88) }),
+    (t) => ({ x: W * 0.95 + Math.sin(t * Math.PI * 2 + 0.4) * W * 0.04, y: H * (0.98 - t * 0.94) }),
+    (t) => ({ x: W * 0.86 + Math.sin(t * Math.PI * 3 + 1.3) * W * 0.035, y: H * (0.94 - t * 0.88) }),
     (t) => {
       const a = Math.PI * 1.12 + t * Math.PI * 1.76;
-      const grow = 1.15 + t * 2.4;
+      const grow = 1.15 + t * 2.6;
       return {
         x: L.skull.x + Math.cos(a) * (L.skull.rx * grow),
         y: L.skull.y + Math.sin(a) * (L.skull.ry * grow * 0.92),
       };
     },
     (t) => ({
-      x: L.cx + (t - 0.5) * W * 0.78,
-      y: H * 0.965 + Math.sin(t * Math.PI * 4) * H * 0.012,
+      x: L.cx + (t - 0.5) * W * 0.9,
+      y: H * 0.965 + Math.sin(t * Math.PI * 4) * H * 0.018,
+    }),
+    (t) => ({ x: W * 0.28 + Math.sin(t * 5.2) * W * 0.1, y: H * (0.06 + t * 0.88) }),
+    (t) => ({ x: W * 0.72 + Math.sin(t * 5.2 + 1.1) * W * 0.1, y: H * (0.06 + t * 0.88) }),
+    (t) => ({ x: W * t, y: H * 0.16 + Math.sin(t * Math.PI * 3.1) * H * 0.1 }),
+    (t) => ({ x: W * t, y: H * 0.38 + Math.sin(t * Math.PI * 2.4 + 0.7) * H * 0.12 }),
+    (t) => ({ x: W * (1 - t), y: H * 0.58 + Math.sin(t * Math.PI * 2.2) * H * 0.1 }),
+    (t) => ({ x: W * (1 - t), y: H * 0.78 + Math.sin(t * Math.PI * 2.6 + 0.4) * H * 0.08 }),
+    (t) => {
+      const a = t * Math.PI * 2;
+      return {
+        x: L.cx + Math.cos(a) * L.ribs.rx * (1.7 + t * 1.1),
+        y: L.torso.y + Math.sin(a) * (L.ribs.y1 - L.ribs.y0) * 0.72,
+      };
+    },
+    (t) => ({
+      x: W * 0.5 + Math.sin(t * Math.PI * 2) * W * 0.46,
+      y: H * 0.08 + Math.cos(t * Math.PI * 3) * H * 0.07,
     }),
   ];
-  const perStream = Math.max(8, Math.round(count / streams.length));
+  const streamBudget = Math.min(count, Math.round(count * 0.42));
+  const perStream = Math.max(10, Math.round(streamBudget / streams.length));
   const out = [];
   for (let s = 0; s < streams.length; s++) {
     for (let i = 0; i < perStream; i++) {
@@ -715,12 +742,34 @@ export function backgroundCurrentParticles(L, {
         y: point.y,
         dx: ahead.x - point.x,
         dy: ahead.y - point.y,
-        alpha: soundFieldAttenuation(t) * (0.22 + 0.48 * (0.45 + flowRate)),
-        radius: (1.6 + (s % 2) * 0.45) * breathPlumeScale(t),
+        alpha: (0.1 + 0.22 * flowRate) + soundFieldAttenuation(t) * (0.18 + 0.38 * (0.45 + flowRate)),
+        radius: (1.5 + (s % 2) * 0.4) * (0.7 + 0.45 * breathPlumeScale(t)),
         blink: 0.22 + 0.78 * Math.max(0, Math.sin(timeMs * 0.046 + (i + s * 17) * 2.17)) ** 2,
         phonated,
       });
     }
+  }
+  const moteN = Math.max(48, count - out.length);
+  for (let i = 0; i < moteN; i++) {
+    const seedX = ((i * 137 + 19) % 1000) / 1000;
+    const seedY = ((i * 89 + 41) % 1000) / 1000;
+    const localDir = streamSign(direction, i + 31);
+    const phase = ((seedX + timeMs * speedMag * 0.72 + (i % 9) * 0.07) % 1 + 1) % 1;
+    const t = localDir > 0 ? 1 - phase : phase;
+    const x = ((seedX + localDir * t * 0.22) % 1 + 1) % 1 * W;
+    const y = ((seedY + t * 0.1 * localDir + Math.sin((seedX + t) * Math.PI * 2) * 0.04) % 1 + 1) % 1 * H;
+    const aheadX = ((seedX + localDir * clamp(t + 0.03) * 0.22) % 1 + 1) % 1 * W;
+    const aheadY = ((seedY + clamp(t + 0.03) * 0.1 * localDir) % 1 + 1) % 1 * H;
+    out.push({
+      x,
+      y,
+      dx: aheadX - x,
+      dy: aheadY - y,
+      alpha: (0.12 + 0.28 * flowRate) * (0.4 + 0.6 * (1 - Math.abs(t - 0.4))),
+      radius: 1.15 + (i % 5) * 0.35 + t * 1.1,
+      blink: 0.22 + 0.78 * Math.max(0, Math.sin(timeMs * 0.046 + (i + 51) * 2.17)) ** 2,
+      phonated,
+    });
   }
   return out;
 }
@@ -744,6 +793,7 @@ export function anatomyDrawPlan(visualStates, {
   viewYawRadians = 0,
   figureZoom = 1,
   seeThrough = false,
+  features = {},
 } = {}) {
   const states = stateMap(visualStates);
   const diaphragm = states.get('diaphragmMotion');
@@ -792,6 +842,16 @@ export function anatomyDrawPlan(visualStates, {
   } else if (!pose && direction != null) {
     resolvedPose.flowDirection = direction;
     if (!(resolvedPose.flowRate > 0.04) && direction !== 0) resolvedPose.flowRate = 0.7;
+  }
+
+  const humming = inferHumming(features, {
+    mouthOpen: resolvedPose.mouthOpen,
+    nasalShare: resolvedPose.nasalShare,
+  });
+  if (showRespiratory && humming.active) {
+    resolvedPose.nasalShare = Math.max(resolvedPose.nasalShare || 0, 0.78);
+    resolvedPose.mouthOpen = Math.min(resolvedPose.mouthOpen || 0.12, 0.08);
+    resolvedPose.jawDrop = Math.min(resolvedPose.jawDrop || 0.12, 0.1);
   }
 
   const simulatedBreath = {
@@ -844,7 +904,7 @@ export function anatomyDrawPlan(visualStates, {
       evidenceClass: 'simulated',
       respiratoryPhase,
       structureIds: VAGUS_STRUCTURE_IDS,
-      label: 'generic vagus and phrenic anatomy; neural activity is not measured',
+      label: 'breath + vagus + spine + head/brain + heart · neural activity is not measured',
       caveat: 'Diaphragm motor drive is phrenic. Vagal pathways shown here are visceral sensory, parasympathetic, and laryngeal branches.',
     },
     view: {
@@ -894,6 +954,18 @@ export function anatomyDrawPlan(visualStates, {
       energy: phonated ? 0.62 : 0,
       frequencyHertz: Number(pitch?.value) > 60 ? Number(pitch.value) : 0,
       formantsHertz: showResonance && Array.isArray(formants?.value) ? formants.value.filter((hz) => hz > 0) : [],
+    }),
+    humming,
+    structureVibration: structureVibrationFromVoice({
+      chestAmount: showRegistration ? assertiveness(chest) : 0,
+      mixedAmount: showRegistration ? assertiveness(mixed) : 0,
+      headAmount: showRegistration ? assertiveness(skullRim) : 0,
+      hummingAmount: humming.amount,
+      energy: phonated ? 0.62 : 0,
+      rmsAmplitude: Number(features.rmsAmplitude) || 0,
+      frequencyHertz: Number(pitch?.value) > 60
+        ? Number(pitch.value)
+        : (Number(features.fundamentalFrequencyHertz) > 60 ? Number(features.fundamentalFrequencyHertz) : 0),
     }),
     tension: {
       jaw: showTension ? assertiveness(jaw) : 0,
@@ -1035,8 +1107,8 @@ export function exteriorBreathJetParticles(L, {
   if (!(flowRate > 0.04)) return [];
   const holding = Math.abs(direction) < 0.12;
   const drive = clamp(Math.max(flowRate, holding ? 0.18 : 0));
-  const oralN = Math.max(48, Math.round((88 + drive * 72) * (0.55 + clamp(mouthOpen) * 0.5)));
-  const nasalN = Math.max(28, Math.round((48 + drive * 44) * Math.max(0.4, nasalShare)));
+  const oralN = Math.max(90, Math.round((140 + drive * 110) * (0.6 + clamp(mouthOpen) * 0.55)));
+  const nasalN = Math.max(48, Math.round((72 + drive * 64) * Math.max(0.4, nasalShare)));
   const speed = pitchLinkedSpeed(0.00052 * (0.5 + drive), { phonated, frequencyHertz, timeMs });
   const facing = jetFacingX(yawRadians);
   const out = [];
@@ -1048,7 +1120,7 @@ export function exteriorBreathJetParticles(L, {
       out.push({
         path,
         t,
-        lane: ((i % 7) - 3) / 3,
+        lane: ((i % 13) - 6) / 6,
         alpha: soundFieldAttenuation(t) * (0.55 + drive * 0.45) * share * (holding ? 0.85 : 1),
         radius: path === 'nasalJet' ? 2.4 + drive * 1.8 : 3.1 + drive * 2.6,
         phonated: path === 'oralJet' && phonated,
@@ -1135,6 +1207,7 @@ export function drawAnatomyV2(ctx, W, H, plan) {
   drawAirflow(ctx, L, plan);
   if (!plan.vagus?.focus) drawInternalResonance(ctx, L, plan);
   drawMixedArchitectureVibration(ctx, L, plan);
+  drawStructureVibration(ctx, L, plan);
   drawFormants(ctx, L, plan.resonance);
   if (plan.vagus?.active) {
     ctx.globalAlpha = frontAlpha;
@@ -1145,7 +1218,6 @@ export function drawAnatomyV2(ctx, W, H, plan) {
       drawDiaphragm(ctx, L);
       drawTrachea(ctx, L);
       drawPharynx(ctx, L, plan);
-      drawLarynx(ctx, L, plan);
       drawDetailedHeart(ctx, L, vagusHeartState(plan), {
         arterial: 'rgba(255,116,108,0.92)',
         venous: 'rgba(110,168,238,0.88)',
@@ -1154,12 +1226,17 @@ export function drawAnatomyV2(ctx, W, H, plan) {
       drawAirflow(ctx, L, plan);
       drawInternalResonance(ctx, L, plan);
       drawMixedArchitectureVibration(ctx, L, plan);
+      drawStructureVibration(ctx, L, plan);
     }
     drawBreathVagusSystem(ctx, L, plan);
     for (const id of VAGUS_STRUCTURE_IDS) mark(id);
   }
   drawSupportOrganization(ctx, L, plan);
   drawOuterContour(ctx, L);
+  ctx.globalAlpha = 1;
+  drawAirwayColumn(ctx, L, plan);
+  drawLarynx(ctx, L, plan);
+  drawStructureVibration(ctx, L, plan);
   ctx.restore();
   ctx.globalAlpha = 1;
   drawExteriorBreathJets(ctx, L, plan);
@@ -1173,6 +1250,23 @@ export function drawAnatomyV2(ctx, W, H, plan) {
         y: H - L.S(plan.lanes ? 96 : 70),
       });
     }
+  }
+  {
+    const chambers = plan.breathResonance?.chambers || {};
+    if ((chambers.oral || 0) > 0.04 || (chambers.pharynx || 0) > 0.04 || (chambers.nasal || 0) > 0.04) {
+      drawChamberResonanceLegend(ctx, L, chambers, {
+        x: L.W - L.S(118),
+        y: H - L.S(plan.lanes ? 96 : 70),
+      });
+    }
+  }
+  if (plan.humming?.active) {
+    ctx.save();
+    ctx.font = 'bold 10px "JetBrains Mono", monospace';
+    ctx.fillStyle = rgbaVoice(SKULL_CHAMBER_RGB, 0.95);
+    ctx.textAlign = 'left';
+    ctx.fillText('humming · inferred', L.S(16), H - L.S(plan.lanes ? 118 : 92));
+    ctx.restore();
   }
   drawLanes(ctx, W, H, plan.lanes);
   drawEvidenceFooter(ctx, W, H, plan);
@@ -1451,25 +1545,33 @@ function drawInternalResonance(ctx, L, plan) {
   const at = (pts, u) => pts[Math.min(pts.length - 1, Math.max(0, Math.round(u * (pts.length - 1))))];
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
-  if (chambers.pharynx > 0.04) {
-    const pt = at(oral, 0.18);
-    fillCavityWaves(
-      ctx, pt.x, pt.y, L.S(16 + (L.pose?.mouthOpen || 0) * 10), L.S(26 + (L.pose?.mouthOpen || 0) * 14),
-      TRACT_RGB, chambers.pharynx, timeMs, 0.16, formants[1],
-    );
-  }
   if (chambers.oral > 0.04) {
+    fillCavityWaves(
+      ctx, L.cx, L.lungs.y + L.S(6),
+      L.ribs.rx * 0.62, L.lungs.ry * 0.7,
+      CHEST_CHAMBER_RGB, chambers.oral, timeMs, 0.08, formants[0],
+    );
     const pt = at(oral, 0.62);
     fillCavityWaves(
-      ctx, pt.x, pt.y, L.S(22 + (L.pose?.mouthOpen || 0) * 18), L.S(14 + (L.pose?.mouthOpen || 0) * 16),
-      TRACT_RGB, chambers.oral, timeMs, 0.22, formants[0],
+      ctx, pt.x, pt.y, L.S(24 + (L.pose?.mouthOpen || 0) * 20), L.S(16 + (L.pose?.mouthOpen || 0) * 18),
+      CHEST_CHAMBER_RGB, chambers.oral, timeMs, 0.22, formants[0],
+    );
+  }
+  if (chambers.pharynx > 0.04) {
+    fillCavityWaves(
+      ctx, L.cx, L.pharynx.y0, L.S(16), L.S(22),
+      THROAT_CHAMBER_RGB, chambers.pharynx, timeMs, 0.16, formants[1],
     );
   }
   if (chambers.nasal > 0.04) {
     const pt = at(nasal, 0.72);
     fillCavityWaves(
-      ctx, pt.x, pt.y, L.S(18), L.S(12),
-      SKULL_CHAMBER_RGB, chambers.nasal, timeMs, 0.3, formants[2] || formants[1],
+      ctx, pt.x, pt.y, L.S(10), L.S(8),
+      SKULL_CHAMBER_RGB, chambers.nasal * 0.35, timeMs, 0.3, formants[2] || formants[1],
+    );
+    fillCavityWaves(
+      ctx, L.brain.x, L.brain.stemY, L.S(20), L.S(26),
+      SKULL_CHAMBER_RGB, chambers.nasal, timeMs, 0.42, formants[2] || formants[1],
     );
   }
   ctx.restore();
@@ -1524,11 +1626,132 @@ function drawMixedArchitectureVibration(ctx, L, plan) {
   ctx.restore();
 }
 
+function strokeBreathLight(ctx, alpha, width) {
+  ctx.strokeStyle = rgbaVoice(STRUCTURE_VIBRATION_RGB, alpha);
+  ctx.lineWidth = width;
+}
+
+function drawStructureVibration(ctx, L, plan) {
+  const vib = plan.structureVibration;
+  if (!vib || !(vib.amount > 0.06) || !(vib.visualHz > 0)) return;
+  const timeMs = plan.timeMs || 0;
+  const phase = ((timeMs / 1000) * vib.visualHz) % 1;
+  const pulse = 0.55 + 0.45 * Math.sin(phase * Math.PI * 2);
+  const wobble = (amount) => 1 + 0.018 * pulse * amount;
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+
+  if (vib.skullRim > 0.08) {
+    const a = 0.72 + 0.28 * vib.skullRim * pulse;
+    const rx = L.skull.rx * 1.015 * wobble(vib.skullRim);
+    const ry = L.skull.ry * 1.02 * wobble(vib.skullRim);
+    strokeBreathLight(ctx, a * 0.35, 2.4);
+    ctx.beginPath();
+    ctx.ellipse(L.skull.x, L.skull.y - L.S(6), rx, ry, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    strokeBreathLight(ctx, a, 0.85 + 0.35 * pulse);
+    ctx.beginPath();
+    ctx.ellipse(L.skull.x, L.skull.y - L.S(6), rx, ry, 0, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  if (vib.chestBones > 0.08) {
+    const a = 0.7 + 0.3 * vib.chestBones * pulse;
+    const scale = wobble(vib.chestBones);
+    const hair = 0.7 + 0.28 * pulse;
+    for (const rib of L.ribs.pairs) {
+      if (rib.kind === 'floating') continue;
+      const drop = rib.obliquity * L.S(18);
+      for (const side of [-1, 1]) {
+        strokeBreathLight(ctx, a, hair);
+        ctx.beginPath();
+        ctx.moveTo(L.cx + side * L.S(11), rib.y - L.S(3));
+        ctx.bezierCurveTo(
+          L.cx + side * rib.rx * 0.42 * scale,
+          rib.y - L.S(2),
+          L.cx + side * rib.rx * scale,
+          rib.y + drop * 0.35,
+          L.cx + side * rib.rx * rib.anterior * scale,
+          rib.y + drop,
+        );
+        ctx.stroke();
+      }
+    }
+    strokeBreathLight(ctx, a, hair);
+    ctx.beginPath();
+    ctx.moveTo(L.cx - L.S(10) * scale, L.sternum.y0);
+    ctx.lineTo(L.cx + L.S(10) * scale, L.sternum.y0);
+    ctx.lineTo(L.cx + L.S(6) * scale, L.xiphoid.y - L.S(8));
+    ctx.lineTo(L.cx, L.xiphoid.y + L.S(10));
+    ctx.lineTo(L.cx - L.S(6) * scale, L.xiphoid.y - L.S(8));
+    ctx.closePath();
+    ctx.stroke();
+    const cage = L.ribs.pairs.filter((rib) => rib.kind !== 'floating');
+    if (cage.length) {
+      strokeBreathLight(ctx, a * 0.95, 0.9 + 0.25 * pulse);
+      for (const side of [-1, 1]) {
+        ctx.beginPath();
+        cage.forEach((rib, i) => {
+          const drop = rib.obliquity * L.S(18);
+          const x = L.cx + side * rib.rx * scale;
+          const y = rib.y + drop * 0.35;
+          if (i === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        });
+        ctx.stroke();
+      }
+    }
+  }
+  ctx.restore();
+}
+
+function drawAirwayColumn(ctx, L, plan = {}) {
+  const topY = L.brain?.stemY ?? L.spine.y0;
+  const xiphoidY = L.xiphoid.y + L.S(8);
+  const left = [
+    { x: L.cx - L.S(7), y: xiphoidY },
+    { x: L.trachea.x - L.trachea.w * 0.62, y: L.bronchi.y },
+    { x: L.trachea.x - L.trachea.w * 0.58, y: L.trachea.y0 },
+    { x: L.larynx.x - L.S(16), y: L.larynx.y + L.S(10) },
+    { x: L.pharynx.x - L.pharynx.w * 0.48, y: L.pharynx.y1 },
+    { x: L.pharynx.x - L.pharynx.w * 0.4, y: L.pharynx.y0 },
+    { x: L.cx - L.S(9), y: topY },
+  ];
+  const right = left.map((pt) => ({ x: L.cx * 2 - pt.x, y: pt.y }));
+  ctx.save();
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  ctx.strokeStyle = rgbaVoice(AIRWAY_COLUMN_RGB, 0.38);
+  ctx.lineWidth = 3.4;
+  ctx.beginPath();
+  ctx.moveTo(L.cx, xiphoidY);
+  ctx.lineTo(L.cx, topY);
+  ctx.stroke();
+  ctx.strokeStyle = rgbaVoice(AIRWAY_COLUMN_RGB, 0.96);
+  ctx.lineWidth = 1.55;
+  for (const side of [left, right]) {
+    ctx.beginPath();
+    side.forEach((pt, i) => (i === 0 ? ctx.moveTo(pt.x, pt.y) : ctx.lineTo(pt.x, pt.y)));
+    ctx.stroke();
+  }
+  ctx.strokeStyle = rgbaVoice(AIRWAY_COLUMN_RGB, 0.88);
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.moveTo(left[0].x, left[0].y);
+  ctx.lineTo(right[0].x, right[0].y);
+  ctx.moveTo(left[left.length - 1].x, left[left.length - 1].y);
+  ctx.lineTo(right[right.length - 1].x, right[right.length - 1].y);
+  ctx.stroke();
+  ctx.restore();
+}
+
 function fillCavityWaves(ctx, cx, cy, rx, ry, rgb, energy, timeMs, phase, formantHertz = 0) {
-  const a = 0.14 + energy * 0.42;
+  const a = 0.32 + energy * 0.58;
   const g = ctx.createRadialGradient(cx, cy, 3, cx, cy, Math.max(rx, ry));
   g.addColorStop(0, `rgba(${rgb.r},${rgb.g},${rgb.b},${a})`);
-  g.addColorStop(0.55, `rgba(${Math.min(255, rgb.r + 40)},${rgb.g},${Math.min(255, rgb.b + 30)},${a * 0.45})`);
+  g.addColorStop(0.55, `rgba(${Math.min(255, rgb.r + 40)},${Math.min(255, rgb.g + 24)},${Math.min(255, rgb.b + 30)},${a * 0.55})`);
   g.addColorStop(1, `rgba(${rgb.r},${rgb.g},${rgb.b},0)`);
   ctx.fillStyle = g;
   ctx.beginPath();
@@ -1542,8 +1765,8 @@ function fillCavityWaves(ctx, cx, cy, rx, ry, rgb, energy, timeMs, phase, forman
   for (let i = 0; i < 7; i++) {
     const t = ((i / 7) + (timeMs / 1000) * visualHz + phase) % 1;
     const y = cy - ry + t * ry * 2;
-    ctx.strokeStyle = `rgba(${rgb.r},${rgb.g},${rgb.b},${0.2 + energy * 0.5})`;
-    ctx.lineWidth = 2.8 + energy * 5.2;
+    ctx.strokeStyle = `rgba(${rgb.r},${rgb.g},${rgb.b},${0.38 + energy * 0.55})`;
+    ctx.lineWidth = 3.4 + energy * 6.2;
     ctx.beginPath();
     ctx.ellipse(cx, y, rx * (0.82 + 0.1 * Math.sin(t * Math.PI)), Math.max(5, ry * 0.14), 0, 0, Math.PI * 2);
     ctx.stroke();
@@ -2061,8 +2284,7 @@ function drawNeckMuscles(ctx, L, plan) {
 
 function drawPharynx(ctx, L, plan) {
   const a = plan.transparent ? 0.16 : 0.28;
-  const res = plan.breathResonance?.chambers?.pharynx || 0;
-  ctx.fillStyle = rgbaVoice(TRACT_RGB, a + res * 0.22);
+  ctx.fillStyle = rgbaVoice(TRACT_RGB, a);
   ctx.beginPath();
   ctx.moveTo(L.pharynx.x - L.pharynx.w / 2, L.pharynx.y0);
   ctx.lineTo(L.pharynx.x + L.pharynx.w / 2, L.pharynx.y0);
@@ -2070,44 +2292,61 @@ function drawPharynx(ctx, L, plan) {
   ctx.lineTo(L.pharynx.x - L.pharynx.w * 0.7, L.pharynx.y1);
   ctx.closePath();
   ctx.fill();
-  ctx.strokeStyle = rgbaVoice(TRACT_RGB, 0.55 + res * 0.2);
+  ctx.strokeStyle = rgbaVoice(TRACT_RGB, 0.55);
   ctx.lineWidth = 2.4;
   ctx.stroke();
 }
 
-function drawLarynx(ctx, L, plan) {
+function drawLarynx(ctx, L, plan = {}) {
   const open = L.larynx.glottisOpen;
-  ctx.fillStyle = rgbaVoice(TRACT_RGB, 0.22);
+  const vib = plan.structureVibration || {};
+  const timeMs = plan.timeMs || 0;
+  const pulse = vib.throatCartilage > 0.08 && vib.visualHz > 0
+    ? 0.55 + 0.45 * Math.sin(((timeMs / 1000) * vib.visualHz) % 1 * Math.PI * 2)
+    : 1;
+  const scale = 1 + 0.02 * (vib.throatCartilage || 0) * pulse;
+  ctx.save();
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  ctx.fillStyle = rgbaVoice(LARYNX_RGB, 0.42);
   ctx.beginPath();
-  ctx.moveTo(L.larynx.x, L.larynx.y - L.S(10));
-  ctx.lineTo(L.larynx.x + L.S(14), L.larynx.y + L.S(6));
-  ctx.lineTo(L.larynx.x + L.S(8), L.larynx.y + L.S(12));
-  ctx.lineTo(L.larynx.x - L.S(8), L.larynx.y + L.S(12));
-  ctx.lineTo(L.larynx.x - L.S(14), L.larynx.y + L.S(6));
+  ctx.moveTo(L.larynx.x, L.larynx.y - L.S(12) * scale);
+  ctx.lineTo(L.larynx.x + L.S(16) * scale, L.larynx.y + L.S(5));
+  ctx.lineTo(L.larynx.x + L.S(10) * scale, L.larynx.y + L.S(14) * scale);
+  ctx.lineTo(L.larynx.x - L.S(10) * scale, L.larynx.y + L.S(14) * scale);
+  ctx.lineTo(L.larynx.x - L.S(16) * scale, L.larynx.y + L.S(5));
   ctx.closePath();
   ctx.fill();
-  ctx.strokeStyle = rgbaVoice(TRACT_RGB, 0.7);
-  ctx.lineWidth = 1.3;
+  ctx.strokeStyle = rgbaVoice(LARYNX_RGB, 0.98);
+  ctx.lineWidth = 2.35;
   ctx.stroke();
 
-  ctx.strokeStyle = rgbaVoice(OUTLINE_RGB, 0.45);
+  ctx.strokeStyle = rgbaVoice(LARYNX_RGB, 0.9);
+  ctx.lineWidth = 1.7;
   ctx.beginPath();
-  ctx.moveTo(L.cx - L.S(12), L.hyoid.y);
-  ctx.quadraticCurveTo(L.cx, L.hyoid.y - L.S(3), L.cx + L.S(12), L.hyoid.y);
+  ctx.moveTo(L.cx - L.S(15) * scale, L.hyoid.y);
+  ctx.quadraticCurveTo(L.cx, L.hyoid.y - L.S(5) * scale, L.cx + L.S(15) * scale, L.hyoid.y);
   ctx.stroke();
 
-  const f = plan.actualPitch.frequencyHertz;
-  const phon = plan.airflow.phonated && f;
-  const wiggle = phon ? Math.sin(plan.timeMs * 0.001 * Math.min(f, 14) * 0.55) * 1.8 : 0;
+  ctx.strokeStyle = rgbaVoice(LARYNX_RGB, 0.7);
+  ctx.lineWidth = 1.35;
+  ctx.beginPath();
+  ctx.ellipse(L.larynx.x, L.larynx.y + L.S(16) * scale, L.S(9) * scale, L.S(3.2), 0, 0, Math.PI * 2);
+  ctx.stroke();
+
+  const f = plan.actualPitch?.frequencyHertz;
+  const phon = plan.airflow?.phonated && f;
+  const wiggle = phon ? Math.sin(timeMs * 0.001 * Math.min(f, 14) * 0.55) * 1.8 : 0;
   const gap = L.S(1.2 + open * 7);
-  ctx.strokeStyle = rgbaVoice(AIRFLOW_RGB, phon ? 0.9 : 0.45);
-  ctx.lineWidth = 1.6;
+  ctx.strokeStyle = 'rgba(255, 248, 255, 0.96)';
+  ctx.lineWidth = 1.85;
   ctx.beginPath();
   ctx.moveTo(L.larynx.x - L.S(7), L.larynx.y - gap + wiggle);
   ctx.quadraticCurveTo(L.larynx.x, L.larynx.y - gap * 0.2 + wiggle, L.larynx.x + L.S(7), L.larynx.y - gap - wiggle);
   ctx.moveTo(L.larynx.x - L.S(7), L.larynx.y + gap - wiggle);
   ctx.quadraticCurveTo(L.larynx.x, L.larynx.y + gap * 0.2 - wiggle, L.larynx.x + L.S(7), L.larynx.y + gap + wiggle);
   ctx.stroke();
+  ctx.restore();
 }
 
 function drawEmbeddedSagittalHead(ctx, L, plan) {
@@ -2272,13 +2511,13 @@ function drawRegisterVoiceFields(ctx, L, plan = {}, options = {}) {
       L.cx, L.lungs.y + L.S(10), L.S(6),
       L.cx, L.lungs.y + L.S(8), L.ribs.rx * 0.82,
     );
-    g.addColorStop(0, rgbaVoice(CHEST_CHAMBER_RGB, a));
-    g.addColorStop(0.72, rgbaVoice(CHEST_CHAMBER_RGB, a * 0.32));
-    g.addColorStop(1, rgbaVoice(CHEST_CHAMBER_RGB, 0));
+    g.addColorStop(0, rgbaVoice(CHEST_VOICE_RGB, a));
+    g.addColorStop(0.72, rgbaVoice(CHEST_VOICE_RGB, a * 0.32));
+    g.addColorStop(1, rgbaVoice(CHEST_VOICE_RGB, 0));
     ctx.fillStyle = g;
     ctx.fillRect(L.cx - L.ribs.rx, L.ribs.y0 - L.S(8), L.ribs.rx * 2, L.ribs.y1 - L.ribs.y0 + L.S(16));
     ctx.restore();
-    ctx.strokeStyle = rgbaVoice(CHEST_CHAMBER_RGB, 0.55 + 0.35 * chest);
+    ctx.strokeStyle = rgbaVoice(CHEST_VOICE_RGB, 0.55 + 0.35 * chest);
     ctx.lineWidth = 2.2;
     ctx.beginPath();
     ctx.ellipse(L.cx, L.lungs.y + L.S(8), L.ribs.rx * 0.72, L.lungs.ry * 0.82, 0, 0, Math.PI * 2);
@@ -2298,6 +2537,29 @@ function drawRegisterVoiceFields(ctx, L, plan = {}, options = {}) {
   }
   ctx.restore();
   if (options.legend !== false) drawRegisterVoiceLegend(ctx, L, amounts);
+}
+
+function drawChamberResonanceLegend(ctx, L, chambers = {}, origin = null) {
+  const x = origin?.x ?? (L.W - L.S(118));
+  const y0 = origin?.y ?? (L.H - L.S(70));
+  const swatch = (rgb, label, amount, y) => {
+    ctx.fillStyle = rgbaVoice(rgb, 0.28 + 0.7 * Math.max(0.18, amount));
+    ctx.fillRect(x, y - 7, 10, 10);
+    ctx.fillStyle = amount > 0.12
+      ? rgbaVoice(rgb, 0.98)
+      : 'rgba(150,162,178,0.45)';
+    ctx.fillText(`${label} ${Math.round(amount * 100)}%`, x + 16, y);
+  };
+  ctx.save();
+  ctx.font = 'bold 10px "JetBrains Mono", monospace';
+  ctx.textAlign = 'left';
+  ctx.fillStyle = 'rgba(174,194,207,0.78)';
+  ctx.fillText('resonance · filter', x, y0);
+  ctx.font = '9px "JetBrains Mono", monospace';
+  swatch(CHEST_CHAMBER_RGB, 'chest', Number(chambers.oral) || 0, y0 + 16);
+  swatch(THROAT_CHAMBER_RGB, 'throat', Number(chambers.pharynx) || 0, y0 + 30);
+  swatch(SKULL_CHAMBER_RGB, 'head', Number(chambers.nasal) || 0, y0 + 44);
+  ctx.restore();
 }
 
 function drawRegisterVoiceLegend(ctx, L, amounts, origin = null) {
@@ -2325,8 +2587,9 @@ function drawRegisterVoiceLegend(ctx, L, amounts, origin = null) {
 
 function drawNasalCavity(ctx, L, plan) {
   const res = plan.breathResonance?.chambers?.nasal || 0;
-  ctx.strokeStyle = rgbaVoice(TRACT_RGB, 0.5 + res * 0.25);
-  ctx.fillStyle = rgbaVoice(TRACT_RGB, (plan.transparent ? 0.06 : 0.12) + res * 0.18);
+  const rgb = res > 0.04 ? SKULL_CHAMBER_RGB : TRACT_RGB;
+  ctx.strokeStyle = rgbaVoice(rgb, 0.5 + res * 0.35);
+  ctx.fillStyle = rgbaVoice(rgb, (plan.transparent ? 0.06 : 0.12) + res * 0.42);
   ctx.lineWidth = 1.8;
   ctx.beginPath();
   ctx.moveTo(L.nasal.x, L.nasal.y - L.nasal.ry);
@@ -2352,8 +2615,9 @@ function drawNasalCavity(ctx, L, plan) {
 
 function drawOralCavity(ctx, L, plan) {
   const res = plan.breathResonance?.chambers?.oral || 0;
-  ctx.strokeStyle = rgbaVoice(TRACT_RGB, 0.55 + res * 0.2);
-  ctx.fillStyle = rgbaVoice(TRACT_RGB, (plan.transparent ? 0.07 : 0.14) + res * 0.18);
+  const rgb = res > 0.04 ? CHEST_CHAMBER_RGB : TRACT_RGB;
+  ctx.strokeStyle = rgbaVoice(rgb, 0.55 + res * 0.3);
+  ctx.fillStyle = rgbaVoice(rgb, (plan.transparent ? 0.07 : 0.14) + res * 0.42);
   ctx.lineWidth = 1.8;
   ctx.beginPath();
   ctx.ellipse(L.oral.x, L.oral.y, L.oral.rx, L.oral.ry, 0, 0, Math.PI * 2);
@@ -2447,7 +2711,7 @@ function drawBackgroundCurrents(ctx, L, plan) {
     direction,
     flowRate: Math.max(flowRate, 0.16),
     phonated: plan.airflow?.phonated,
-    count: 168,
+    count: 480,
     frequencyHertz: plan.airflow?.frequencyHertz || 0,
   });
   ctx.save();
@@ -2487,7 +2751,7 @@ function drawExteriorBreathJets(ctx, L, plan) {
   const mouth = projectedAnatomyPoint(L, view, L.mouth.x, L.mouth.y);
   const naris = projectedAnatomyPoint(L, view, L.nasal.x, L.nasal.y + L.nasal.ry * 0.55);
   const drive = clamp(Math.max(flowRate, 0.18));
-  const travel = Math.max(L.W * 0.78, L.S(460));
+  const travel = Math.max(L.W * 0.94, L.S(560));
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
   if (Math.abs(direction) > 0.12) {
@@ -2502,7 +2766,7 @@ function drawExteriorBreathJets(ctx, L, plan) {
     mist.addColorStop(0.35, rgbaVoice(AIRFLOW_RGB, inbound ? 0.1 : 0.1));
     mist.addColorStop(1, rgbaVoice(AIRFLOW_RGB, inbound ? 0.22 + drive * 0.18 : 0));
     ctx.fillStyle = mist;
-    const fan = 28 + drive * 64;
+    const fan = 56 + drive * 110;
     ctx.beginPath();
     ctx.moveTo(origin.x, origin.y - 8);
     ctx.lineTo(farX, origin.y - fan);
@@ -2515,8 +2779,8 @@ function drawExteriorBreathJets(ctx, L, plan) {
     const origin = p.path === 'nasalJet' ? naris : mouth;
     const facing = p.facing;
     const plume = breathPlumeScale(p.t);
-    const spread = p.lane * (18 + p.t * 110);
-    const lift = p.path === 'nasalJet' ? -12 - p.t * 40 : 6 + p.t * 26;
+    const spread = p.lane * (28 + p.t * 170);
+    const lift = p.path === 'nasalJet' ? -18 - p.t * 56 : 8 + p.t * 38;
     const x = origin.x + facing * p.t * travel;
     const y = origin.y + lift + spread;
     const r = p.radius * plume;
@@ -2781,6 +3045,8 @@ function drawRegionCallouts(ctx, L, plan = {}) {
   }
   if (plan.vagus?.active) {
     left.push({ text: 'brain', x: L.brain.x - L.S(8), y: L.brain.y });
+    left.push({ text: 'spine', x: L.cx - L.S(16), y: (L.spine.y0 + L.larynx.y) * 0.5 });
+    left.push({ text: 'heart', x: L.heart.x, y: L.heart.y });
   }
   const minGap = Math.max(22, L.S(20));
   const placedRight = spreadCalloutYs(right, minGap, L.S(28), L.H - L.S(36));
@@ -2872,7 +3138,7 @@ function drawCaptions(ctx, L, W, plan) {
     facts.push('support evidence · personal, not diaphragm truth');
   }
   if (plan.vagus?.active) {
-    facts.push(`vagus/phrenic generic anatomy · ${plan.vagus.respiratoryPhase}`);
+    facts.push(`breath + vagus + spine + head/brain + heart · ${plan.vagus.respiratoryPhase} · simulated`);
   }
   if (!facts.length) return;
   ctx.save();
@@ -2902,7 +3168,7 @@ function drawEvidenceFooter(ctx, W, H, plan) {
   ctx.textAlign = 'right';
   ctx.fillStyle = 'rgba(107,122,136,0.85)';
   const circulation = plan.circulatory?.active ? ' · circulation simulated' : '';
-  const vagus = plan.vagus?.active ? ' · vagus/phrenic generic anatomy' : '';
+  const vagus = plan.vagus?.active ? ' · breath + vagus + spine + head/brain + heart simulated' : '';
   ctx.fillText(`registration inferred · breath anatomy simulated${circulation}${vagus} · tension = evidence not diagnosis`, W - 14, H - 12);
 }
 

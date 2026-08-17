@@ -39,9 +39,11 @@ Practical differences from the original spec text:
 - **Zoom:** `−` / `+` in the bottom-left of the main figure and the skull dialog. Scroll also zooms. The torso hangs from the skull, so zooming in enlarges the head without dropping it into the chest. The sagittal head is fitted to the cranial vault and seated on the cervical spine, including in side view. The skull vault stays in frame when zoomed out.
 - **Voice field:** simulated breath is intense at the lips and nose, then spreads and fades into the room on both exhale and inhale (approximately 1/r). Interior tract air stays visible.
 - **Mixed voice** can drive a pitch-linked vibration along the vocal architecture (folds → tract, with a faint chest coupling). That is inferred source–filter coupling, not a claim that the whole body is a resonator.
-- **Anatomy color language:** silver body outline; mint airflow; magenta vocal tract as the bridge between chest-orange and head-blue; ice-cyan head space (sinuses, nasal cavity, ear canals); visible teal lungs under bright ribs; red/blue circulation. Open /a/ widens mouth and throat.
+- **Anatomy color language:** silver body outline; mint airflow; magenta vocal-tract walls as the bridge between chest-orange and head-blue **register**. Filter chambers light separately when active: amber-gold chest resonance, lemon throat resonance, electric-cyan head resonance. Lungs stay visible teal under bright ribs; circulation stays red/blue. Open /a/ widens mouth and throat.
+- **Register glow:** chest, mixed, and head do not light at once from leftover probability. The winning class lights; a transition may light the from/to pair. Head-voice blue sits on the brainstem. Throat resonance sits at the top of the neck / cervical spine.
+- **Felt vibration:** head and mixed shake the skull rim. Chest and mixed shake ribs, sternum, spine, and laryngeal cartilage. Skull-rim and ribcage vibration is a razor-thin mint line matching breath, to mark breath control for register. The airway is outlined in hot rose from the xiphoid to the top of the spine; the voice box is indigo so it stays readable. A closed-lip humming candidate (inferred) couples vibration into the skull and nasal path. This is not a claim that the skeleton is a resonator.
 
-Hard-refresh so `index.html` loads `main.js?v=restore-1`.
+Hard-refresh so `index.html` loads `main.js?v=breath-line-1`.
 
 ### Plain-language terminology
 

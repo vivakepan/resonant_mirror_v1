@@ -12,6 +12,7 @@
  */
 
 import { tractConfigurationFromFormants } from './tractShape.js';
+import { inferHumming } from './humming.js';
 
 function clamp(v, lo = 0, hi = 1) {
   return Math.max(lo, Math.min(hi, v));
@@ -108,19 +109,23 @@ export function mouthArticulationFromAcoustics(features = {}, extras = {}) {
     ? Math.max(vowelBoosted, 0.56)
     : 0;
 
-  const mouthOpen = Math.min(cap, clamp(Math.max(
+  const humming = inferHumming(features, {
+    mouthOpen: Math.min(cap, clamp(Math.max(vowelBoosted, screamOpen, unknownPhonationOpen, beltFloor))),
+    nasalShare: tract.velumOpen || 0,
+  });
+  let mouthOpen = Math.min(cap, clamp(Math.max(
     vowelBoosted,
     screamOpen,
     unknownPhonationOpen,
     beltFloor,
   )));
-  const jawDrop = Math.min(cap, clamp(Math.max(
+  let jawDrop = Math.min(cap, clamp(Math.max(
     vowelReliable ? tract.jawDrop + (1 - tract.height) * intensity * 0.18 : 0,
     screamOpen * 0.92,
     unknownPhonationOpen * 0.78,
     beltFloor * 0.9,
   )));
-  const lipSpread = vowelReliable
+  let lipSpread = vowelReliable
     ? tract.lipSpread
     : screamOpen > 0.4
       ? 0.2
@@ -128,6 +133,13 @@ export function mouthArticulationFromAcoustics(features = {}, extras = {}) {
   const hold = screamOpen > 0.35
     || beltFloor > 0.5
     || (vowelReliable && tract.mouthOpen > 0.48 && intensity > 0.3);
+  let velumOpen = tract.velumOpen || 0;
+  if (humming.active) {
+    mouthOpen = Math.min(mouthOpen, 0.07);
+    jawDrop = Math.min(jawDrop, 0.09);
+    lipSpread = Math.min(lipSpread, 0.16);
+    velumOpen = Math.max(velumOpen, 0.78);
+  }
 
   return {
     mouthOpen,
@@ -135,18 +147,23 @@ export function mouthArticulationFromAcoustics(features = {}, extras = {}) {
     lipSpread,
     jawRetract: tract.jawRetract || 0,
     headTuck: tract.headTuck || 0,
-    velumOpen: tract.velumOpen || 0,
+    velumOpen,
     vowelOpen: vowelReliable ? tract.mouthOpen : 0,
     screamOpen,
-    hold,
+    hold: humming.active ? false : hold,
+    humming,
     tract,
-    evidenceClass: vowelReliable ? 'derived' : (screamOpen > 0 || phonated ? 'inferred' : 'unknown'),
-    label: screamOpen > 0.4
-      ? 'wide aperture · scream / distortion acoustics'
-      : vowelReliable
-        ? `tract aperture · F1 ${Math.round(f1)} Hz`
-        : phonated
-          ? 'aperture from level · formants unknown'
-          : 'aperture unknown',
+    evidenceClass: humming.active
+      ? 'inferred'
+      : vowelReliable ? 'derived' : (screamOpen > 0 || phonated ? 'inferred' : 'unknown'),
+    label: humming.active
+      ? humming.label
+      : screamOpen > 0.4
+        ? 'wide aperture · scream / distortion acoustics'
+        : vowelReliable
+          ? `tract aperture · F1 ${Math.round(f1)} Hz`
+          : phonated
+            ? 'aperture from level · formants unknown'
+            : 'aperture unknown',
   };
 }

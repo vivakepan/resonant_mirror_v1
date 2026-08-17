@@ -46,7 +46,9 @@ python3 tests/v2/test_ml_pipeline.py
 - Mouth aperture follows F1 or scream acoustics; it is not a single phonated preset. Open vowels and screams use a much larger visual jaw/lip range than rest or /i/.
 - Zooming the figure keeps the skull above the shoulders; the torso hangs from the jaw.
 - The sagittal head overlay is fitted to the vault and seated on the cervical spine.
-- Anatomy hues stay distinct: silver outline, mint airflow, magenta tract, ice-cyan head space, visible teal lungs. Oral airflow follows the anterior tract. Breath is intense at the aperture and diffuses into the room.
+- Anatomy hues stay distinct: silver outline, mint airflow, magenta tract walls, amber chest / lemon throat / cyan head resonance, visible teal lungs. Oral airflow follows the anterior tract. Breath is intense at the aperture and diffuses into the room.
+- Only the winning register lights the figure; leftover class probability does not light the other two. Head-voice glow sits on the brainstem. Throat resonance sits at the top of the neck.
+- Head/mixed vibrate the skull rim; chest/mixed vibrate ribs, spine, and laryngeal cartilage. Skull-rim and ribcage vibration uses the mint breath color. The airway is outlined from the xiphoid to the top of the spine; the voice box is a contrasting indigo. Humming is an inferred closed-lip candidate, not lip tracking.
 - Simulated voice/air intensity falls with distance instead of cutting off at a hard radius. Open /a/ widens mouth and throat.
 - Skull-rim mapping is `inferred` or `simulated`, never cavity proof.
 

@@ -82,9 +82,9 @@ export class Anatomy3DRenderer {
     this.root.add(extrudeSagittal(SKULL_OUTLINE, 0.62, bone, 0.05));
     this.root.add(extrudeSagittal(MANDIBLE_OUTLINE, 0.48, bone, 0.04));
 
-    this.headHalo = ring(1.34, 1.48, 0.012, chamberMat(0x5cdfff, 0.14, 0x2ebbe8));
+    this.headHalo = ring(0.38, 0.52, 0.016, chamberMat(0x38b0ff, 0.18, 0x1a7ad0));
     this.headHalo.rotation.y = Math.PI / 2;
-    this.headHalo.position.set(0.08, 0.22, -0.04);
+    this.headHalo.position.set(0.02, 0.02, -0.22);
     this.root.add(this.headHalo);
 
     this.root.add(addEyeball(this, 1, 0.4, 0.18, 0.86));

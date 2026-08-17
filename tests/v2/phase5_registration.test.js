@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { RegistrationEstimator, REGISTRATION_CLASSES } from '../../src/v2/registration/estimator.js';
+import { RegistrationEstimator, REGISTRATION_CLASSES, registerGlowFromInference } from '../../src/v2/registration/estimator.js';
 import { createVocalFrame, emptyFeatures } from '../../src/v2/contracts/schemas.js';
 import { composeVisualStates } from '../../src/v2/visualization/composeVisuals.js';
 import { defaultFeatureFlags } from '../../src/v2/contracts/featureFlags.js';
@@ -70,6 +70,37 @@ describe('Phase 5 — registration', () => {
     assert.equal(visuals.find((v) => v.visualName === 'chestRegionGlow').evidenceClass, 'inferred');
     assert.ok(visuals.find((v) => v.visualName === 'chestRegionGlow').value > 0.18);
     const mixed = visuals.find((v) => v.visualName === 'mixedCoordinationField');
-    assert.equal(mixed.evidenceClass, 'inferred');
+    assert.equal(mixed.evidenceClass, 'unknown');
+    assert.equal(visuals.find((v) => v.visualName === 'skullRimUpperProduction').evidenceClass, 'unknown');
+  });
+
+  it('does not light all three registers from leftover probability mass', () => {
+    const chest = registerGlowFromInference({
+      class: 'chest_dominant',
+      confidence: 0.62,
+      probabilities: { chest_dominant: 0.62, mixed: 0.22, head_dominant: 0.16 },
+    });
+    assert.ok(chest.chest > 0.5);
+    assert.equal(chest.mixed, 0);
+    assert.equal(chest.head, 0);
+
+    const mixed = registerGlowFromInference({
+      class: 'mixed',
+      confidence: 0.5,
+      probabilities: { chest_dominant: 0.32, mixed: 0.4, head_dominant: 0.28 },
+    });
+    assert.ok(mixed.mixed > 0.35);
+    assert.equal(mixed.chest, 0);
+    assert.equal(mixed.head, 0);
+
+    const hop = registerGlowFromInference({
+      class: 'transition',
+      confidence: 0.4,
+      transition: { from: 'chest_dominant', to: 'head_dominant' },
+      probabilities: { chest_dominant: 0.4, mixed: 0.2, head_dominant: 0.4 },
+    });
+    assert.ok(hop.chest > 0.3);
+    assert.ok(hop.head > 0.3);
+    assert.equal(hop.mixed, 0);
   });
 });

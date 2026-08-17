@@ -115,6 +115,12 @@ header {
   top: 3.35rem;
   left: 0.75rem;
   bottom: auto;
+  max-width: 13.8rem;
+  white-space: normal;
+  line-height: 1.25;
+  text-align: left;
+  font-size: 10px;
+  padding: 0.38rem 0.5rem;
   border-color: rgba(255,205,92,0.44);
   color: #ffd875;
   background: transparent;
@@ -136,7 +142,7 @@ header {
   pointer-events: none;
 }
 .view-preset-btn {
-  top: 5.95rem;
+  top: 8.15rem;
   left: 0.75rem;
   right: auto;
   bottom: auto;

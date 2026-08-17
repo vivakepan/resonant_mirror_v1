@@ -50,13 +50,18 @@ import { nextSkullZoom, tubeTractDimensions } from '../../src/v2/anatomy/anatomy
 import { snapshotPoseForClass } from '../../src/v2/anatomy/breathKinematics.js';
 import {
   AIRFLOW_RGB,
+  AIRWAY_COLUMN_RGB,
   BONE_RGB,
+  CHEST_CHAMBER_RGB,
   CHEST_VOICE_RGB,
   HEAD_VOICE_RGB,
+  LARYNX_RGB,
   LUNG_RGB,
   MUSCLE_RGB,
   OUTLINE_RGB,
   SKULL_CHAMBER_RGB,
+  STRUCTURE_VIBRATION_RGB,
+  THROAT_CHAMBER_RGB,
   TRACT_RGB,
   mixedSystemVibration,
   mixedVoiceRgb,
@@ -82,6 +87,8 @@ import {
 } from '../../src/v2/anatomy/vocalFoldDynamics.js';
 import { resolveVisualState, createUnknownVisualState } from '../../src/v2/visualization/mirrorState.js';
 import { vowelMapFromFormants, formatVowelSensationLine } from '../../src/v2/resonance/vowelMap.js';
+import { inferHumming } from '../../src/v2/resonance/humming.js';
+import { mouthArticulationFromAcoustics } from '../../src/v2/resonance/mouthArticulation.js';
 
 const SR = 48000;
 
@@ -345,17 +352,8 @@ describe('Phase 3 — anatomy contracts', () => {
     assert.ok(mixedOnly.mixed > 0.7);
     assert.notDeepEqual(mixedOnly.mixedRgb, CHEST_VOICE_RGB);
     assert.notDeepEqual(mixedOnly.mixedRgb, HEAD_VOICE_RGB);
-    const chestPlan = anatomyDrawPlan([
-      resolveVisualState({
-        visualName: 'chestRegionGlow',
-        timestampSeconds: 1,
-        value: 0.7,
-        evidenceClass: 'inferred',
-        observedAtSeconds: 1,
-      }),
-    ]);
     const ctx = stubCanvas();
-    drawAnatomyV2(ctx, 400, 720, chestPlan);
+    drawAnatomyV2(ctx, 400, 720, anatomyDrawPlan([]));
     const close = skullCloseupState({
       inferences: {
         registration: {
@@ -364,11 +362,49 @@ describe('Phase 3 — anatomy contracts', () => {
           probabilities: { chest_dominant: 0.42, mixed: 0.48, head_dominant: 0.38 },
         },
       },
-    }, chestPlan);
-    assert.ok(close.registerAmounts.chest > 0.3);
-    assert.ok(close.registerAmounts.head > 0.3);
+    });
+    assert.ok(close.registerAmounts.mixed > 0.4);
+    assert.ok(close.registerAmounts.chest < 0.05, 'mixed class must not also light chest');
+    assert.ok(close.registerAmounts.head < 0.05, 'mixed class must not also light head');
     assert.ok(close.registerAmounts.mixedRgb.r !== CHEST_VOICE_RGB.r || close.registerAmounts.mixedRgb.b !== CHEST_VOICE_RGB.b);
     drawSkullCloseup(ctx, 720, 520, close, 80);
+  });
+
+  it('lights only the winning register, not leftover probability on the other two', () => {
+    const chest = skullCloseupState({
+      inferences: {
+        registration: {
+          class: 'chest_dominant',
+          confidence: 0.62,
+          probabilities: { chest_dominant: 0.62, mixed: 0.22, head_dominant: 0.1 },
+        },
+      },
+    });
+    assert.ok(chest.registerAmounts.chest > 0.5);
+    assert.equal(chest.registerAmounts.mixed, 0);
+    assert.equal(chest.registerAmounts.head, 0);
+
+    const head = skullCloseupState({
+      inferences: {
+        registration: {
+          class: 'head_dominant',
+          confidence: 0.7,
+          probabilities: { chest_dominant: 0.12, mixed: 0.2, head_dominant: 0.62 },
+        },
+      },
+    });
+    assert.ok(head.registerAmounts.head > 0.5);
+    assert.equal(head.registerAmounts.chest, 0);
+    assert.equal(head.registerAmounts.mixed, 0);
+  });
+
+  it('places head voice on the brainstem and throat resonance at the top of the neck', () => {
+    assert.ok(SAGITTAL_LOCAL.headVoiceY > SAGITTAL_LOCAL.orbitY, 'brainstem sits below the orbit');
+    assert.ok(SAGITTAL_LOCAL.headVoiceY < SAGITTAL_LOCAL.larynxY, 'brainstem sits above the larynx');
+    assert.ok(SAGITTAL_LOCAL.headVoiceX < SAGITTAL_LOCAL.orbitX, 'brainstem is posterior to the orbit');
+    assert.ok(SAGITTAL_LOCAL.throatResonanceY > SAGITTAL_LOCAL.brainstemY, 'throat sits below the brainstem');
+    assert.ok(SAGITTAL_LOCAL.throatResonanceY <= SAGITTAL_LOCAL.baseY + 12, 'throat sits at the top of the neck');
+    assert.equal(SAGITTAL_LOCAL.headVoiceY, SAGITTAL_LOCAL.brainstemY);
   });
 
   it('keeps anatomy layer hues distinct so systems do not share a color', () => {
@@ -376,14 +412,32 @@ describe('Phase 3 — anatomy contracts', () => {
     assert.ok(TRACT_RGB.b > TRACT_RGB.g && TRACT_RGB.r > 180, 'tract is magenta, the bridge between registers');
     assert.ok(TRACT_RGB.g < CHEST_VOICE_RGB.g, 'tract is not chest-orange');
     assert.ok(TRACT_RGB.r > HEAD_VOICE_RGB.r, 'tract is not head-blue');
-    assert.ok(SKULL_CHAMBER_RGB.b > SKULL_CHAMBER_RGB.r + 80, 'head space is ice cyan');
-    assert.ok(SKULL_CHAMBER_RGB.g > HEAD_VOICE_RGB.g, 'head space is cyanner than head register');
+    assert.ok(CHEST_CHAMBER_RGB.g > CHEST_VOICE_RGB.g, 'chest resonance is amber, not register orange');
+    assert.ok(THROAT_CHAMBER_RGB.g > CHEST_CHAMBER_RGB.g, 'throat resonance is lemon, brighter than chest gold');
+    assert.ok(THROAT_CHAMBER_RGB.r > TRACT_RGB.g && THROAT_CHAMBER_RGB.g > 200, 'throat resonance is not tract magenta');
+    assert.ok(SKULL_CHAMBER_RGB.b > SKULL_CHAMBER_RGB.r + 80, 'head resonance is electric cyan');
+    assert.ok(SKULL_CHAMBER_RGB.g > HEAD_VOICE_RGB.g, 'head resonance is cyanner than head register');
+    assert.ok(SKULL_CHAMBER_RGB.b > AIRFLOW_RGB.b + 40, 'head resonance is not mint airflow');
     assert.ok(LUNG_RGB.b > LUNG_RGB.r, 'lungs stay cool teal');
     assert.ok(BONE_RGB.r + BONE_RGB.g + BONE_RGB.b > LUNG_RGB.r + LUNG_RGB.g + LUNG_RGB.b + 150, 'ribs stay brighter than lung fill');
     assert.ok(OUTLINE_RGB.b > OUTLINE_RGB.r, 'body contour is cool silver');
     assert.ok(MUSCLE_RGB.r > MUSCLE_RGB.b, 'muscle stays in the dusty-rose family');
+    assert.ok(AIRWAY_COLUMN_RGB.r > 240 && AIRWAY_COLUMN_RGB.g < 80 && AIRWAY_COLUMN_RGB.b > 80, 'airway column is hot rose');
+    assert.ok(LARYNX_RGB.b > LARYNX_RGB.r + 80 && LARYNX_RGB.b > LARYNX_RGB.g, 'voice box is indigo');
+    assert.notDeepEqual(AIRWAY_COLUMN_RGB, TRACT_RGB);
+    assert.notDeepEqual(AIRWAY_COLUMN_RGB, LARYNX_RGB);
+    assert.notDeepEqual(LARYNX_RGB, TRACT_RGB);
+    assert.notDeepEqual(LARYNX_RGB, HEAD_VOICE_RGB);
+    assert.notDeepEqual(LARYNX_RGB, AIRFLOW_RGB);
+    assert.deepEqual(STRUCTURE_VIBRATION_RGB, AIRFLOW_RGB);
     assert.notDeepEqual(AIRFLOW_RGB, HEAD_VOICE_RGB);
     assert.notDeepEqual(AIRFLOW_RGB, CHEST_VOICE_RGB);
+    assert.notDeepEqual(CHEST_CHAMBER_RGB, CHEST_VOICE_RGB);
+    assert.notDeepEqual(THROAT_CHAMBER_RGB, TRACT_RGB);
+    assert.notDeepEqual(SKULL_CHAMBER_RGB, HEAD_VOICE_RGB);
+    assert.notDeepEqual(CHEST_CHAMBER_RGB, THROAT_CHAMBER_RGB);
+    assert.notDeepEqual(THROAT_CHAMBER_RGB, SKULL_CHAMBER_RGB);
+    assert.notDeepEqual(CHEST_CHAMBER_RGB, SKULL_CHAMBER_RGB);
   });
 
   it('moves diaphragm, ribs, and lungs with simulated respiratory pose, not pitch', () => {
@@ -418,8 +472,10 @@ describe('Phase 3 — anatomy contracts', () => {
       direction: -1,
       flowRate: 0.7,
     });
-    assert.ok(particles.length > 20);
+    assert.ok(particles.length > 200, 'the room stays filled with drifting air');
     assert.ok(particles.every((p) => Number.isFinite(p.x) && Number.isFinite(p.y)));
+    assert.ok(particles.some((p) => p.x < L.W * 0.12 && p.y < L.H * 0.2), 'currents reach the upper-left field');
+    assert.ok(particles.some((p) => p.x > L.W * 0.88 && p.y > L.H * 0.8), 'currents reach the lower-right field');
     assert.ok(particles.some((p) => p.x < L.cx - L.ribs.rx));
     assert.ok(particles.some((p) => p.x > L.cx + L.ribs.rx));
     assert.ok(particles.some((p) => p.blink < 0.5));
@@ -613,6 +669,110 @@ describe('Phase 3 — anatomy contracts', () => {
     });
     assert.ok(plan.mixedVibration.amount > 0.15);
     assert.match(plan.mixedVibration.label, /not whole-body/i);
+    assert.ok(plan.structureVibration.skullRim > 0.2, 'mixed shakes the skull rim');
+    assert.ok(plan.structureVibration.chestBones > 0.2, 'mixed shakes chest bones');
+    assert.ok(plan.structureVibration.spine > 0.2, 'mixed shakes the spine');
+    assert.ok(plan.structureVibration.throatCartilage > 0.2, 'mixed shakes throat cartilage');
+    assert.match(plan.structureVibration.label, /not whole-body/i);
+  });
+
+  it('vibrates the skull rim for head voice and chest bones for chest voice', () => {
+    const pose = snapshotPoseForClass('phonated_exhale');
+    const pitch = resolveVisualState({
+      visualName: 'actualPitchLayer',
+      timestampSeconds: 1,
+      value: 220,
+      evidenceClass: 'derived',
+      observedAtSeconds: 1,
+    });
+    const breath = resolveVisualState({
+      visualName: 'breathLaneUser',
+      timestampSeconds: 1,
+      value: 'phonated_exhale',
+      evidenceClass: 'inferred',
+      observedAtSeconds: 1,
+    });
+    const head = anatomyDrawPlan([
+      pitch,
+      breath,
+      resolveVisualState({
+        visualName: 'skullRimUpperProduction',
+        timestampSeconds: 1,
+        value: 0.8,
+        evidenceClass: 'inferred',
+        observedAtSeconds: 1,
+      }),
+    ], { pose, showRegistration: true, showRespiratory: true });
+    assert.ok(head.structureVibration.skullRim > 0.3);
+    assert.ok(head.structureVibration.chestBones < 0.15);
+
+    const chest = anatomyDrawPlan([
+      pitch,
+      breath,
+      resolveVisualState({
+        visualName: 'chestRegionGlow',
+        timestampSeconds: 1,
+        value: 0.8,
+        evidenceClass: 'inferred',
+        observedAtSeconds: 1,
+      }),
+    ], { pose, showRegistration: true, showRespiratory: true });
+    assert.ok(chest.structureVibration.chestBones > 0.3);
+    assert.ok(chest.structureVibration.spine > 0.2);
+    assert.ok(chest.structureVibration.throatCartilage > 0.2);
+    assert.ok(chest.structureVibration.skullRim < 0.15);
+  });
+
+  it('recognizes a humming candidate and does not treat hee as a hum', () => {
+    const hum = inferHumming({
+      fundamentalFrequencyHertz: 180,
+      pitchConfidence: 0.72,
+      periodicity: 0.82,
+      rmsAmplitude: 0.08,
+      spectralCentroidHertz: 1200,
+      harmonicity: 0.7,
+      formantsHertz: [280, 1100, 2400],
+    }, { mouthOpen: 0.08, nasalShare: 0.7 });
+    assert.equal(hum.evidenceClass, 'inferred');
+    assert.ok(hum.amount > 0.42);
+    const hee = inferHumming({
+      fundamentalFrequencyHertz: 220,
+      pitchConfidence: 0.8,
+      periodicity: 0.85,
+      rmsAmplitude: 0.12,
+      spectralCentroidHertz: 2100,
+      formantsHertz: [280, 2260, 3000],
+    });
+    assert.ok(hee.amount < 0.42, 'close-front vowel is not humming');
+    const pose = mouthArticulationFromAcoustics({
+      fundamentalFrequencyHertz: 180,
+      pitchConfidence: 0.72,
+      periodicity: 0.82,
+      rmsAmplitude: 0.08,
+      spectralCentroidHertz: 1200,
+      harmonicity: 0.7,
+      formantsHertz: [280, 1100, 2400],
+      formantConfidence: [0.5, 0.4, 0.3],
+    }, { sung: true });
+    assert.ok(pose.humming.active);
+    assert.ok(pose.mouthOpen < 0.1);
+    assert.ok(pose.velumOpen > 0.7);
+    const plan = anatomyDrawPlan([], {
+      pose: snapshotPoseForClass('phonated_exhale'),
+      showRespiratory: true,
+      features: {
+        fundamentalFrequencyHertz: 180,
+        pitchConfidence: 0.72,
+        periodicity: 0.82,
+        rmsAmplitude: 0.08,
+        spectralCentroidHertz: 1200,
+        harmonicity: 0.7,
+        formantsHertz: [280, 1100, 2400],
+      },
+    });
+    assert.ok(plan.humming.active);
+    assert.ok(plan.structureVibration.skullRim > 0.3, 'humming vibrates the skull');
+    assert.ok(plan.simulatedBreath.pose.nasalShare > 0.7);
   });
 
   it('drives close-up resonance and mouth air from acoustic energy, not a beat pulse', () => {
@@ -818,6 +978,9 @@ describe('Phase 3 — anatomy contracts', () => {
     assert.equal(plan.vagus.active, true);
     assert.equal(plan.vagus.focus, true);
     assert.equal(plan.vagus.evidenceClass, 'simulated');
+    assert.match(plan.vagus.label, /spine/i);
+    assert.match(plan.vagus.label, /brain/i);
+    assert.match(plan.vagus.label, /heart/i);
     assert.match(plan.vagus.caveat, /diaphragm motor drive is phrenic/i);
 
     const pathways = vagusAnatomyPaths(400, 720, plan.simulatedBreath);

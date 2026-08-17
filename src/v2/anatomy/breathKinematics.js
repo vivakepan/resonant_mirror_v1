@@ -401,6 +401,11 @@ export class VoiceSyncedBreath {
       p.nasalShare = lerp(p.nasalShare, 0.08 + (tract.velumOpen || 0) * 0.82, 7 * dt);
       p.jawRetract = lerp(p.jawRetract ?? 0, tract.jawRetract || 0, 8 * dt);
       p.headTuck = lerp(p.headTuck ?? 0, tract.headTuck || 0, 7 * dt);
+      if (art.humming?.active) {
+        p.nasalShare = lerp(p.nasalShare, 0.84, 10 * dt);
+        p.mouthOpen = lerp(p.mouthOpen, 0.06, 16 * dt);
+        p.jawDrop = lerp(p.jawDrop, 0.08, 12 * dt);
+      }
     } else if (resp === 'inhale' || risingBreath || ((resp !== 'pause' || forceRecovery) && speculativeInhale)) {
       this.className = 'inhale';
       p.lungVolume = clamp(p.lungVolume + 1.85 * dt);

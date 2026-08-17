@@ -163,6 +163,7 @@ describe('Phase 0 — feature flags and research gates', () => {
     assert.equal(flags.personalWeightTraining.liveSessionWeightUpdates, false);
     assert.equal(userFacingAllowed(flags.respiration.status), false);
     assert.equal(flags.legacyPhysicsLayer.isolated, true);
+    assert.equal(flags.legacyPhysicsLayer.enabled, false);
     assert.equal(flags.wholeSystemCoordination.status, 'disabled');
     assert.doesNotThrow(() => assertNoLiveWeightUpdates(flags));
   });

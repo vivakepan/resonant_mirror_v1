@@ -5,6 +5,8 @@
  * Frame-level guesses are smoothed; unknown is a first-class state.
  */
 
+import { voiceActivity } from '../anatomy/breathKinematics.js';
+
 export const RESPIRATION_CLASSES = Object.freeze([
   'inhale',
   'phonated_exhale',
@@ -13,31 +15,47 @@ export const RESPIRATION_CLASSES = Object.freeze([
   'unknown',
 ]);
 
-export const RESPIRATION_MODEL_VERSION = 'respiration-heuristic-0';
+export const RESPIRATION_MODEL_VERSION = 'respiration-heuristic-1';
 export const RESPIRATION_CAPABILITY_STATUS = 'research_target';
 
 const CLASS_INDEX = Object.fromEntries(RESPIRATION_CLASSES.map((c, i) => [c, i]));
 
 /**
  * PROVISIONAL frame classifier. Not a validated detector.
- * Uses voiced energy vs noisy residual vs silence.
+ * Uses vocal-source cues vs pitched-instrument cues vs quiet breath noise.
  */
-export function classifyRespirationFrame(features) {
+export function classifyRespirationFrame(features, extras = {}) {
   const rms = features.rmsAmplitude ?? 0;
   const periodicity = features.periodicity ?? 0;
   const centroid = features.spectralCentroidHertz;
   const db = features.relativeLevelDecibelsFullScale ?? -120;
+  const dRms = Number(extras.dRms) || 0;
+  const v = voiceActivity(features);
 
-  if (db < -55 || rms < 0.004) {
-    return { class: 'pause', confidence: 0.45, scores: scoresToward('pause', 0.45) };
+  if (v.pitchedInstrument || v.percussion) {
+    return { class: 'pause', confidence: 0.4, scores: scoresToward('pause', 0.4) };
   }
-  if (periodicity >= 0.45 && db > -40) {
-    return { class: 'phonated_exhale', confidence: Math.min(0.75, 0.4 + periodicity * 0.4), scores: scoresToward('phonated_exhale', 0.7) };
+  if (db < -62 && rms < 0.0014) {
+    return { class: 'pause', confidence: 0.42, scores: scoresToward('pause', 0.42) };
   }
-  const noisy = periodicity < 0.25 && rms > 0.01;
-  const bright = centroid != null && centroid > 1800;
+  if (v.sung || (periodicity >= 0.38 && db > -48 && rms > 0.007 && !v.pitchedInstrument)) {
+    return {
+      class: 'phonated_exhale',
+      confidence: Math.min(0.78, 0.38 + periodicity * 0.42),
+      scores: scoresToward('phonated_exhale', 0.7),
+    };
+  }
+  const breathNoise = v.breathNoise || (periodicity < 0.28 && rms > 0.0018 && rms < 0.09);
+  if (breathNoise && (dRms > 0.0007 || (rms > 0.003 && dRms >= 0))) {
+    return { class: 'inhale', confidence: 0.42, scores: scoresToward('inhale', 0.42) };
+  }
+  if (breathNoise && dRms < -0.0005) {
+    return { class: 'unphonated_exhale', confidence: 0.38, scores: scoresToward('unphonated_exhale', 0.38) };
+  }
+  const noisy = periodicity < 0.25 && rms > 0.008;
+  const bright = centroid != null && centroid > 1400;
   if (noisy && bright) {
-    return { class: 'inhale', confidence: 0.35, scores: scoresToward('inhale', 0.35) };
+    return { class: 'inhale', confidence: 0.36, scores: scoresToward('inhale', 0.36) };
   }
   if (noisy) {
     return { class: 'unphonated_exhale', confidence: 0.3, scores: scoresToward('unphonated_exhale', 0.3) };
@@ -90,14 +108,18 @@ export class TemporalSmoother {
 export class RespirationEstimator {
   constructor({ source = 'user' } = {}) {
     this.source = source;
-    this.smoother = new TemporalSmoother();
+    this.smoother = new TemporalSmoother({ window: 5, minHold: 3 });
     this.openEvent = null;
     this.events = [];
     this.modelVersion = RESPIRATION_MODEL_VERSION;
+    this.prevRms = 0;
   }
 
   infer(frame) {
-    const raw = classifyRespirationFrame(frame.features);
+    const rms = Number(frame.features?.rmsAmplitude) || 0;
+    const dRms = rms - this.prevRms;
+    this.prevRms = rms;
+    const raw = classifyRespirationFrame(frame.features, { dRms });
     const smoothed = this.smoother.push(raw.class);
     const state = {
       class: smoothed,

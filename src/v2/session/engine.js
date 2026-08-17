@@ -34,7 +34,7 @@ export class ObservationEngine {
       startedAt: new Date().toISOString(),
       inputMode: 'microphone',
       captureSettings: captureSettingsRecord(),
-      modelVersions: { vocalEncoder: null, respiration: 'respiration-heuristic-0' },
+      modelVersions: { vocalEncoder: null, respiration: 'respiration-heuristic-1' },
     });
   }
 

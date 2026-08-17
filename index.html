@@ -3,168 +3,238 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>The Resonant Singer — A Visual Tuner</title>
-  <link rel="stylesheet" href="styles/main.css">
+  <title>Resonant Mirror v2 — observation</title>
+  <link rel="stylesheet" href="styles/v2.css">
 </head>
 <body>
-<div class="grain"></div>
-<div class="frame">
-
   <header>
-    <h1>The Resonant Singer · <em>a study in coupled oscillators</em></h1>
-    <div class="meta">SYSTEM · <b id="sysState">SCANNING</b> · <a href="pages/resonant_mirror_v2.html" style="color:#4fd6c4;margin-left:12px;">Resonant Mirror v2</a></div>
+    <h1>Resonant Mirror <em>v2</em></h1>
+    <span class="status">experimental · anatomy simulated</span>
   </header>
 
-  <nav class="left-rail">
-    <h3>off-resonance</h3>
-
-    <button class="anti-btn" data-f="78">
-      <span class="label-main">SUB · 78</span>
-      <span class="label-sub">below all fundamentals*</span>
-    </button>
-
-    <button class="anti-btn ar" data-f="147">
-      <span class="label-main">◊ NULL · 147</span>
-      <span class="label-sub">chest ⇌ trachea — √(120 × 180)</span>
-    </button>
-
-    <button class="anti-btn ar" data-f="355">
-      <span class="label-main">◊ DEAD · 355</span>
-      <span class="label-sub">pharynx ⇌ mouth — √(300 × 420)</span>
-    </button>
-
-    <button class="anti-btn ar" data-f="467">
-      <span class="label-main">◊ COLD · 467</span>
-      <span class="label-sub">mouth ⇌ skull — √(420 × 520)</span>
-    </button>
-
-    <button class="anti-btn ar" data-f="628">
-      <span class="label-main">◊ MUTE · 628</span>
-      <span class="label-sub">nasal ⇌ eyes — √(580 × 680)</span>
-    </button>
-
-    <button class="anti-btn" data-f="845">
-      <span class="label-main">SUPRA · 845</span>
-      <span class="label-sub">above all fundamentals</span>
-    </button>
-
-    <div class="rail-note">
-      <b>SUB / SUPRA:</b> below / above all zone fundamentals. *Note: SUB still excites mid zones faintly through its upper harmonics — truly dead frequencies are rare in a 10-zone harmonic system.<br><br>
-      <span style="color:#b48cff">◊ marked:</span> <strong>spectral nulls</strong> at geometric means between adjacent zone pairs. With a song loaded, <strong>spatial nodes</strong> from the interference field are a separate phenomenon.
-    </div>
-  </nav>
-
-  <main>
-    <canvas id="c"></canvas>
-    <div class="resonance-badge" id="badge">OFF-RESONANCE</div>
-    <div class="system-notice" id="notice"></div>
-    <div class="view-strip" id="viewStrip">
-      <button class="view-btn active" data-view="organs">Organs</button>
-      <button class="view-btn" data-view="flow">Flow</button>
-      <button class="view-btn" data-view="nerves">Nerves</button>
-      <button class="view-btn" data-view="solid">Solid</button>
-      <button class="view-btn" data-view="em">EM</button>
-    </div>
-    <div class="view-caption" id="viewCaption">acoustic resonance through tissue &amp; cavity</div>
-    <div class="drive-chips" id="driveChips"></div>
-    <div class="audio-panel">
-      <div class="row">
-        <button class="audio-btn" id="listen" title="Drive internal source from microphone (on-device FFT)"><span class="lbl">LISTEN</span>● MIC</button>
+  <div class="layout">
+    <main>
+      <div class="anatomy-stage">
+        <canvas
+          id="anatomy"
+          tabindex="0"
+          role="img"
+          aria-label="Responsive anatomy. Drag to turn the head. Click the skull or vocal folds for close-up views."
+        ></canvas>
+        <div class="zoom-toggle" role="group" aria-label="Figure zoom">
+          <button id="figureZoomOut" type="button" title="Zoom out">−</button>
+          <button id="figureZoomIn" type="button" title="Zoom in">+</button>
+        </div>
+        <button id="skullZoomHint" class="skull-zoom-hint" type="button">Skull ⤢</button>
+        <button
+          id="breathVagusBtn"
+          class="breath-vagus-btn"
+          type="button"
+          aria-pressed="false"
+          title="Focus respiratory anatomy, vagal pathways, and the separate phrenic motor supply"
+        >Breath + vagus</button>
+        <button
+          id="viewYawHint"
+          class="view-preset-btn"
+          type="button"
+          aria-pressed="true"
+          title="Toggle three-quarter view. Drag the figure to turn."
+        >¾ view</button>
+        <button id="foldZoomHint" class="fold-zoom-hint" type="button">Vocal folds ⤢</button>
+        <span id="yawReadout" class="rotation-readout">head 36° · drag to turn</span>
+        <span id="breathMode" class="breath-mode">idle breath · simulated</span>
       </div>
-      <div class="audio-meta" id="audioMeta">no mic · slider controls drive</div>
-    </div>
-  </main>
 
-  <aside>
-    <h2>Resonant structures</h2>
-    <div id="zones"></div>
-
-    <div class="panel breath-panel">
-      <h2>Breath · autonomic rhythm</h2>
-      <p class="breath-caveat">
-        <em>Three rhythms: heartbeat (~1 Hz), breath (~0.2 Hz, modulates), vagus (couples).</em>
-      </p>
-      <div class="song-controls">
-        <button id="breathToggle" class="toggle small on">BREATH</button>
-        <button id="breathMode" class="toggle small">MODE · SYNTH</button>
+      <div class="readouts">
+        <div><span>Pitch</span><strong id="pitchReadout">—</strong></div>
+        <div class="pitch-accuracy">
+          <span>Pitch match</span>
+          <strong id="pitchAccuracyReadout">—</strong>
+          <small id="pitchAccuracyDetail">load a reference song</small>
+        </div>
+        <div><span>Level</span><strong id="levelReadout">— dBFS</strong><i id="levelHint">dBFS</i></div>
+        <div><span>Register</span><strong id="registrationReadout">unknown</strong></div>
+        <div>
+          <span>Vowel</span>
+          <strong id="vowelReadout">unknown</strong>
+          <small id="vowelDetail">filter, not register</small>
+        </div>
+        <div><span>Breath</span><strong id="breathReadout">demo</strong></div>
       </div>
-      <div class="song-row">
-        <span class="song-label">PERIOD</span>
-        <input type="range" id="breathPeriod" min="3" max="8" step="0.5" value="5">
-        <span class="song-pct" id="breathPeriodVal">5.0s</span>
+      <div id="tensionReadout" class="sr-status">tension evidence: none</div>
+      <div id="lanes" class="sr-status">separate singer / reference lanes</div>
+
+      <section class="practice" aria-label="Practice instruments">
+        <div class="metronome">
+          <h2>Metronome</h2>
+          <div class="metro-bpm-row">
+            <button id="metroDown" type="button" aria-label="Slower">−</button>
+            <div id="metroBpm" class="metro-bpm">80</div>
+            <button id="metroUp" type="button" aria-label="Faster">+</button>
+          </div>
+          <label class="slider-label">
+            Tempo
+            <input id="metroSlider" type="range" min="30" max="240" value="80">
+          </label>
+          <div id="metroBeats" class="metro-beats" aria-hidden="true"></div>
+          <div class="row">
+            <button id="metroStart" type="button">Start</button>
+            <button id="metroTap" type="button">Tap</button>
+            <label>Meter
+              <select id="metroMeter">
+                <option value="2">2/4</option>
+                <option value="3">3/4</option>
+                <option value="4" selected>4/4</option>
+                <option value="6">6/8</option>
+              </select>
+            </label>
+          </div>
+          <div id="metroStatus" class="hint">stopped</div>
+        </div>
+        <div class="piano-panel">
+          <h2>Piano</h2>
+          <div class="row piano-toolbar">
+            <button id="octaveDown" type="button">Octave −</button>
+            <span id="octaveLabel">C3–C5</span>
+            <button id="octaveUp" type="button">Octave +</button>
+            <span id="pianoNote" class="hint">play a key</span>
+          </div>
+          <div id="pianoKeyboard" class="piano" role="application" aria-label="Playable piano keyboard"></div>
+          <details class="piano-help">
+            <summary>How to play</summary>
+            <p>Click or drag across the keys. Keyboard: Z–M, Q–U; sharps use S D G H J and 2 3 5 6 7. Brackets shift octave.</p>
+          </details>
+        </div>
+      </section>
+    </main>
+
+    <aside>
+      <section>
+        <h2>Inputs</h2>
+        <button id="micBtn">Enable microphone</button>
+        <div id="micStatus" class="hint">off · local only</div>
+        <label class="file">
+          Reference song
+          <input id="songFile" type="file" accept="audio/*">
+        </label>
+        <div id="songStatus" class="hint">none</div>
+        <div class="row">
+          <button id="playBtn">Play</button>
+          <button id="stopBtn">Pause</button>
+        </div>
+        <p id="leakWarn" class="warn"></p>
+      </section>
+
+      <details>
+        <summary>Layers</summary>
+        <div class="details-body">
+          <label><input id="transparent" type="checkbox"> Transparent</label>
+          <label><input id="pitchLayer" type="checkbox" checked> Pitch</label>
+          <label><input id="resonanceLayer" type="checkbox" checked> Formants</label>
+          <label><input id="breathLayer" type="checkbox" checked> Breath</label>
+          <label><input id="circulatoryLayer" type="checkbox" checked> Circulation (simulated)</label>
+          <label><input id="registrationLayer" type="checkbox" checked> Chest / mixed / head</label>
+          <label><input id="tensionLayer" type="checkbox" checked> Tension</label>
+          <label><input id="auraLayer" type="checkbox" checked> Aura</label>
+          <label><input id="supportLayer" type="checkbox"> Support evidence</label>
+          <label><input id="lanesLayer" type="checkbox"> Breath lanes</label>
+        </div>
+      </details>
+
+      <details>
+        <summary>How it felt</summary>
+        <div id="selfLabels" class="details-body"></div>
+      </details>
+
+      <details>
+        <summary>Diagnostics</summary>
+        <div class="details-body">
+          <ul id="legend"></ul>
+          <pre id="latency">microphone off</pre>
+          <div id="inspector"></div>
+        </div>
+      </details>
+    </aside>
+  </div>
+
+  <dialog id="foldDialog" class="fold-dialog">
+    <div class="fold-dialog-head">
+      <div>
+        <h2>Vocal folds</h2>
+        <span class="hint">follows the vocalist while audio is live · simulated · not a camera view</span>
       </div>
-      <div class="breath-meter">
-        <div class="breath-bar" id="breathBar"></div>
-        <div class="breath-tick"></div>
+      <button id="foldClose" type="button" aria-label="Close vocal-fold view">×</button>
+    </div>
+    <label class="fold-technique-picker">
+      Technique model
+      <select id="foldTechniqueSelect">
+        <option value="live">Live vocalist (follows audio)</option>
+        <option value="clean">Clean phonation</option>
+        <option value="chest_dominant">Chest-dominant coordination</option>
+        <option value="mixed">Mixed coordination</option>
+        <option value="head_dominant">Head-dominant coordination</option>
+        <option value="breathy">Breathy phonation</option>
+        <option value="fry">Vocal fry</option>
+        <option value="grit">Grit / rasp</option>
+        <option value="false_fold_distortion">False-fold distortion</option>
+        <option value="growl">Growl</option>
+        <option value="scream">Scream / extreme distortion</option>
+        <option value="pressed">Pressed phonation</option>
+        <option value="whisper">Whisper</option>
+        <option value="falsetto">Falsetto / light head</option>
+        <option value="belt">Belt</option>
+        <option value="twang">Twang</option>
+        <option value="whistle">Whistle register</option>
+      </select>
+    </label>
+    <canvas id="vocalFoldCanvas"></canvas>
+    <div class="fold-opening" aria-label="Modeled mean glottal aperture">
+      <span>closed</span>
+      <div class="fold-opening-track"><i id="foldOpeningMarker"></i></div>
+      <span>open</span>
+    </div>
+    <div class="fold-opening" aria-label="Illustrative modeled vocal-fold tension">
+      <span>slack</span>
+      <div class="fold-tension-track"><i id="foldTensionMarker"></i></div>
+      <span>taut</span>
+    </div>
+    <div class="fold-dynamics">
+      <span id="foldCycle">cycle: unknown</span>
+      <span id="foldContact">contact: unknown</span>
+      <span id="foldWave">mucosal phase: unknown</span>
+    </div>
+    <div class="fold-states">
+      <div><span>Glottal aperture</span><strong id="foldPosture">unknown</strong><small id="foldPostureDetail">modeled, not laryngoscopy</small></div>
+      <div><span>Modeled tension</span><strong id="foldTension">unknown</strong><small id="foldTensionDetail">not measured</small></div>
+      <div><span>Vibration</span><strong id="foldVibration">unknown</strong><small id="foldVibrationDetail">no voiced evidence</small></div>
+      <div><span>Technique</span><strong id="foldTechnique">unknown</strong><small id="foldTechniqueDetail">no voiced evidence</small></div>
+      <div><span>Evidence basis</span><strong id="foldEvidence">illustrative</strong><small id="foldEvidenceDetail">exact percentages are not measured</small></div>
+    </div>
+  </dialog>
+
+  <dialog id="skullDialog" class="skull-dialog">
+    <div class="fold-dialog-head">
+      <div>
+        <h2>Skull &amp; resonant chambers</h2>
+        <span class="hint">larger sagittal head · airways inside nasal and oral cavities · jaw hinges at the TMJ · drag to orbit</span>
+      </div>
+      <button id="skullClose" type="button" aria-label="Close skull view">×</button>
+    </div>
+    <div class="skull-canvas-wrap">
+      <canvas id="skullCanvas" role="img" aria-label="The same sagittal skull as the main figure. Drag to rotate. Use the zoom buttons or scroll to zoom."></canvas>
+      <div class="zoom-toggle skull-zoom-toggle" role="group" aria-label="Skull zoom">
+        <button id="skullZoomOut" type="button" title="Zoom out">−</button>
+        <button id="skullZoomIn" type="button" title="Zoom in">+</button>
       </div>
     </div>
-
-    <div class="panel song-panel">
-      <h2>Song · external source</h2>
-      <p class="song-caveat" title="A song reaches the body via air pressure at both ears. The skull-top entry point shown here is a visualization choice that makes the interference geometry legible — internal source rises from the larynx, external descends from above, the meeting region falls inside the zone array. NOT acoustics.">
-        <em>Source position is artistic, not anatomical.</em>
-        <span class="info-dot">ⓘ</span>
-      </p>
-      <input type="file" id="songFile" accept="audio/*" class="file-input">
-      <label for="songFile" class="file-label">Choose audio file</label>
-      <div class="song-controls">
-        <button id="songPlay" class="toggle small" disabled>▶ PLAY</button>
-        <button id="songStop" class="toggle small" disabled>■ STOP</button>
-        <button id="fieldToggle" class="toggle small on" title="Toggle the two-source interference field rendering. With external source amplitude at zero, the field collapses to a no-op.">FIELD</button>
-      </div>
-      <div class="song-row">
-        <span class="song-label">EXT BAL</span>
-        <input type="range" id="songBalance" min="0" max="1" step="0.05" value="0.7">
-        <span class="song-pct" id="songBalanceVal">70%</span>
-      </div>
-      <div class="song-row">
-        <span class="song-label">PEAKS K</span>
-        <input type="range" id="songK" min="1" max="5" step="1" value="1">
-        <span class="song-pct" id="songKVal">1</span>
-      </div>
-      <div class="song-status" id="songStatus">No song loaded.</div>
+    <div class="skull-readouts">
+      <div><span>Head pattern</span><strong id="skullHeadPattern">unknown</strong><small id="skullHeadEvidence">not inferred</small></div>
+      <div><span>Vocal-tract chambers</span><strong id="skullChambers">unknown</strong><small id="skullChamberEvidence">not measured</small></div>
+      <div><span>Vowel sensation</span><strong id="skullVowel">unknown</strong><small id="skullVowelDetail">filter, not register</small></div>
+      <div><span>Interpretation</span><strong>source–filter model</strong><small id="skullLimitation">Sinuses are not proven primary vocal resonators.</small></div>
     </div>
+  </dialog>
 
-    <div class="panel tools-panel">
-      <h2>Research tools</h2>
-      <p class="panel-note"><em>Opt-in.</em> Export feeds the offline graph engine and journal-noticer. No raw audio leaves the device.</p>
-      <button id="exportSession" class="toggle small">EXPORT SESSION</button>
-    </div>
-
-    <div class="panel">
-      <h2>What you're looking at</h2>
-      <p><em>Driver:</em> the vocal folds (the flaps in the larynx) chop the airstream into a buzz at the fundamental frequency. That buzz is rich in harmonics.</p>
-      <p><em>Resonators:</em> each cavity and bony structure has its own preferred frequency. They respond strongly when the fundamental — or one of its harmonics — lands near their natural mode.</p>
-      <p><em>Coupling:</em> the vagus nerve (green path winding through the chest) and the body's tissues mechanically and neurologically link these zones. Even sub-threshold vibration in one zone biases the others — the <em>"tuning"</em> case.</p>
-      <p><em>Whole-system mode:</em> at certain fundamentals, multiple resonators light up simultaneously through harmonic stacking. That's the singer's experience of the note "ringing through everything."</p>
-      <p><em>Anti-resonance:</em> at the geometric mean between adjacent zone pairs (the ◊-marked buttons on the left), coupled oscillators interfere destructively. Response drops <em>below</em> baseline — not silence, but active cancellation.</p>
-    </div>
-  </aside>
-
-  <footer>
-    <div class="freq-readout">
-      <span id="freqVal">220</span><span class="unit">Hz</span>
-      <span class="note" id="noteName">A3</span>
-    </div>
-    <input type="range" id="freq" min="70" max="3000" value="220" step="1">
-    <div class="presets">
-      <button class="preset-btn" data-f="98">CHEST · 98</button>
-      <button class="preset-btn" data-f="220">A3 · 220</button>
-      <button class="preset-btn" data-f="440">A4 · 440</button>
-      <button class="preset-btn" data-f="587">SKULL · 587</button>
-      <button class="preset-btn" data-f="261.6">SWEET · 262</button>
-      <button class="preset-btn heart-btn" data-f="105">♥ HEART · 105</button>
-      <button class="preset-btn" data-f="2800">SINGER · 2800</button>
-    </div>
-    <button class="speed-btn" id="speed"><span class="lbl">RATE</span>1×</button>
-    <button class="env-btn" id="env"><span class="lbl">ENV</span>NONE</button>
-    <button class="multi-toggle" id="multi" title="Pin multiple drive frequencies">MULTI</button>
-    <button class="clear-btn" id="clearPins" title="Clear pinned drives">×</button>
-    <button class="toggle" id="sweep">SWEEP</button>
-  </footer>
-
-</div>
-
-<script type="module" src="src/main.js"></script>
+  <script type="module" src="src/v2/app/main.js?v=mouth-wide-1"></script>
 </body>
 </html>

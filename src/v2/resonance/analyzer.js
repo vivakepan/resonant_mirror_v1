@@ -7,10 +7,23 @@ import { estimateFormants } from './formants.js';
 import { createProvenance } from '../contracts/provenance.js';
 
 export class ResonanceAnalyzer {
+  constructor() {
+    this.prevHz = null;
+  }
+
   analyzeFrame(frame, samples, sampleRate) {
     const f0 = frame.features.fundamentalFrequencyHertz;
     const result = estimateFormants(samples, sampleRate, { f0 });
-    frame.features.formantsHertz = result.formantsHertz;
+    let hz = result.formantsHertz;
+    if (!result.unknown && this.prevHz) {
+      hz = hz.map((value, i) => {
+        const prev = this.prevHz[i];
+        if (!(value > 0) || !(prev > 0) || Math.abs(value - prev) > 700) return value;
+        return prev * 0.55 + value * 0.45;
+      });
+    }
+    this.prevHz = result.unknown ? null : hz.map((value) => (value > 0 ? value : null));
+    frame.features.formantsHertz = hz;
     frame.features.formantConfidence = result.formantConfidence;
     frame.features.spectralEnvelope = result.spectralEnvelope
       ? Array.from(result.spectralEnvelope.slice(0, 64))
@@ -18,8 +31,13 @@ export class ResonanceAnalyzer {
     for (const flag of result.qualityFlags) {
       if (!frame.qualityFlags.includes(flag)) frame.qualityFlags.push(flag);
     }
+    const evidenceClass = result.unknown
+      ? 'unknown'
+      : result.fallback
+        ? 'inferred'
+        : 'derived';
     frame.provenanceByField['features.formantsHertz'] = createProvenance({
-      evidenceClass: result.unknown ? 'unknown' : 'derived',
+      evidenceClass,
       sourceIds: [`${frame.source}:pcm`],
       algorithmVersion: result.algorithmVersion,
       observedAtSeconds: frame.timestampSeconds,

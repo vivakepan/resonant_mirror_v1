@@ -38,4 +38,38 @@ describe('Phase 5 — registration', () => {
     assert.equal(visuals.find((v) => v.visualName === 'chestRegionGlow').evidenceClass, 'unknown');
     assert.equal(visuals.find((v) => v.visualName === 'skullRimUpperProduction').evidenceClass, 'unknown');
   });
+
+  it('does not treat vowel formants as chest or head register evidence', () => {
+    const f = frame({
+      fundamentalFrequencyHertz: 220,
+      pitchConfidence: 0.8,
+      formantsHertz: [280, 2260, 3000],
+      formantConfidence: [0.8, 0.8, 0.6],
+    });
+    const visuals = composeVisualStates(f, { flags: defaultFeatureFlags() });
+    assert.equal(visuals.find((v) => v.visualName === 'chestRegionGlow').evidenceClass, 'unknown');
+    assert.equal(visuals.find((v) => v.visualName === 'skullRimUpperProduction').evidenceClass, 'unknown');
+    const formants = visuals.find((v) => v.visualName === 'formantTrajectories');
+    assert.equal(formants.evidenceClass, 'derived');
+  });
+
+  it('maps mixed/chest/head from registration probabilities, not from pitch alone', () => {
+    const f = frame({
+      fundamentalFrequencyHertz: 140,
+      pitchConfidence: 0.8,
+      spectralCentroidHertz: 900,
+      spectralTilt: -1.5,
+    });
+    f.inferences.registration = {
+      class: 'chest_dominant',
+      confidence: 0.55,
+      probabilities: { chest_dominant: 0.62, mixed: 0.22, head_dominant: 0.1, transition: 0.05, unknown: 0.01 },
+      modelVersion: 'registration-heuristic-0',
+    };
+    const visuals = composeVisualStates(f, { flags: defaultFeatureFlags() });
+    assert.equal(visuals.find((v) => v.visualName === 'chestRegionGlow').evidenceClass, 'inferred');
+    assert.ok(visuals.find((v) => v.visualName === 'chestRegionGlow').value > 0.18);
+    const mixed = visuals.find((v) => v.visualName === 'mixedCoordinationField');
+    assert.equal(mixed.evidenceClass, 'inferred');
+  });
 });

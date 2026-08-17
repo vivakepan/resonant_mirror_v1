@@ -16,17 +16,30 @@ That specification contains the complete numbered requirements, data contracts, 
 
 ## Project status
 
-Resonant Mirror v2 is implemented incrementally on top of the imported Resonant Singer browser prototype. Phases 0–12 of the specification now have code, tests, and research gates.
+Resonant Mirror v2 is the application. The older Resonant Singer coupled-oscillator prototype has been removed.
 
-Open the observation UI at `pages/resonant_mirror_v2.html` (or `http://localhost:8000/pages/resonant_mirror_v2.html` after `npm run serve`). The legacy visual tuner remains at `index.html`.
+Open `index.html` after `npm run serve` (`http://localhost:8000/`).
 
-Learned outputs (respiration, registration, tension, intensity, support, personal training) stay behind research gates until their evaluation criteria pass. Neural-network weights never update during a live session.
+Learned outputs (respiration, registration, tension, intensity, support, personal training) stay experimental until their evaluation criteria pass. Neural-network weights never update during a live session. Chest / head / mixed visuals are inferred production-pattern mappings. Diaphragm, ribs, and airflow are simulated.
 
-The existing codebase already provides useful foundations including browser microphone analysis, uploaded-audio analysis, deterministic visualizations, breath modeling, session export, offline analysis, and verification scripts. Those foundations should be evolved rather than casually discarded.
+### What the running app does today (17 Aug 2026)
 
-However, legacy hand-tuned resonance zones, two-source field geometry, illustrative register physics, and the old whole-system resonance threshold are **research or visualization artifacts**, not validated physiological ground truth. v2 must preserve that distinction.
+Phases **0–6** of the specification are in the browser app as working observation code. Phases **7–12** (learned encoder, intensity ranking, personal prototypes, support model, phrase model, optional personal training) are specified, not trained.
 
-If the previous root README is archived under `old_files/`, keep it as historical context.
+Practical differences from the original spec text:
+
+- **Airflow** is simulated interior lung→tract motion **and** exterior jets that leave and enter the face. Turning the Breath layer off still stops that motion. Missing a breath-direction visual no longer zeros a live pose that already has flow.
+- **Breath following** prefers the microphone whenever it is on, so a playing reference song does not drive the singer’s anatomy. A provisional heuristic (`respiration-heuristic-1`) is more sensitive to quiet rising breath noise and will not treat a pitched instrument (high periodicity, no vocal formant pair) as phonated exhalation. This is **not** a validated detector.
+- **Mouth shape** follows the vocalist: F1 opens the jaw for /a/-like sounds, loud bright distortion opens and **holds** a scream, and a loud /i/ stays relatively closed. The close-up no longer replaces that pose with a small vowel mouth. Open vowels and screams can drop the jaw much farther than rest. This is still a simulated teaching pose, not lip tracking.
+- **Pre-training vs live listening:** a trustworthy inhale/exhale-and-not-piano classifier, and a trustworthy map from audio (or audio+video) onto technique geometry, belong in **offline / pre-training** (Phase 7 corpus, held-out validation, then a frozen checkpoint). The spec forbids updating weights during a live session. The live heuristic exists so the visualization can follow a vocalist *now*; it must not be described as a trained breath-phase or technique model.
+- **Formant tracking:** LPC envelope first; if those peaks fail, a smoothed spectrum may continue F1/F2 as inferred. High fundamentals still return unknown. Tract chambers can follow spectral energy when formant peaks are missing.
+- **Vocal-fold close-up** is a teaching geometry: vibration and F0 can be derived from audio; opening, tension, and contact are simulated. It is not laryngoscopy.
+- **Lyrics file/paste/overlay is not in the UI.** Filename parsing remains for reference-song labels. Catalog lookup is unused.
+- Layer checkboxes (Pitch, Formants, Breath, Circulation, Chest/mixed/head, Tension, Aura, Support, Breath lanes, Transparent) zero their plan fields. Skull zoom honors those flags.
+- **Zoom:** `−` / `+` in the bottom-left of the main figure and the skull dialog. Scroll also zooms. The skull vault stays in frame when zoomed out. The skull close-up uses a wider camera so cavities and airways are not stacked on top of each other.
+- **Mixed voice** can drive a pitch-linked vibration along the vocal architecture (folds → tract, with a faint chest coupling). That is inferred source–filter coupling, not a claim that the whole body is a resonator.
+
+Hard-refresh so `index.html` loads `main.js?v=mouth-wide-1`.
 
 ### Plain-language terminology
 
@@ -392,12 +405,19 @@ browser microphone
       ↓
 dense acoustic features
       ↓
-local respiratory classifier
+local respiratory classifier (provisional heuristic today;
+offline-trained checkpoint is the research target)
       ↓
 temporal smoothing
       ↓
 inhale | phonated exhale | unphonated exhale | pause | unknown
 ```
+
+The current classifier (`respiration-heuristic-1`) is a **provisional** rule set: it looks for vocal formant structure, rejects pitched-instrument frames that lack that structure, and treats quiet rising broadband noise as an inhale candidate. It is more sensitive than the first heuristic, and it is still not a validated breath-phase sensor.
+
+**Should breath detection and technique geometry be pre-trained?** Yes, for anything asserted to the singer as a trusted inhale/exhale event or a trusted “this is what that scream looks like structurally.” Train (or fine-tune) **offline** on a held-out corpus that includes oral and nasal inhales, phonated phrases, screams/belts/fry with labels, piano/guitar/drums, and room noise. Optional video of jaw/lips can supervise mouth shape. Ship a frozen checkpoint. Do **not** train during a live singing session. Until that gate passes, the heuristic may drive *simulated* anatomy and must stay labeled inferred/simulated.
+
+When both microphone and a reference file are active, anatomy and breath follow the **vocalist microphone**, not the mix. Reference-only playback may still animate, but pitched instruments are not treated as a singer.
 
 For a future Apple-native version, Apple's audio engine and Sound Analysis framework can host microphone-stream classification, including a custom Apple Core ML model. For future Android-native work, the platform's microphone-recording interfaces can provide the audio stream, with less-processed input investigated where supported. These platform frameworks provide audio infrastructure; they are **not** treated as built-in validated breath-phase sensors.
 
@@ -501,7 +521,9 @@ respiratory-state estimate
 deterministic simulated rib / diaphragm animation
 ```
 
-The animation is explanatory visualization, not medical imaging.
+The animation is explanatory visualization, not medical imaging. Interior particles run lungs ↔ mouth/nose; exterior jets continue that path into the room on exhale and reverse it on inhale. Hold/pause keeps a small tidal exchange so the stream does not black out.
+
+Mouth opening is not a canned phonated-exhale pose. Jaw drop follows F1 when formants are reliable (`/a/` open, `/i/` close). A loud bright scream can open farther and stay open even when LPC formants fail. Drums and pitched instruments do not open the mouth.
 
 ### Aura semantics
 
@@ -755,21 +777,21 @@ The two named songs are benchmark examples, not bundled assets, universal labels
 
 Implement v2 in order.
 
-| Phase | Goal |
-|---|---|
-| **0** | repository audit, contracts, evidence ancestry, legacy isolation |
-| **1** | dual input and shared timeline |
-| **2** | deterministic dense acoustic features |
-| **3** | resonance analysis and anatomy v2 |
-| **4** | respiratory-event pipeline |
-| **5** | registration and transition observation |
-| **6** | tension-evidence visualization |
-| **7** | dataset pipeline and small PyTorch encoder |
-| **8** | expressive-intensity ranking |
-| **9** | personal memory and prototypes |
-| **10** | support-related coordination |
-| **11** | phrase-level temporal model |
-| **12** | optional personal model training |
+| Phase | Goal | In the running app |
+|---|---|---|
+| **0** | repository audit, contracts, evidence ancestry, legacy isolation | Yes |
+| **1** | dual input and shared timeline | Yes — mic + uploaded file. DRM streams are not PCM. |
+| **2** | deterministic dense acoustic features | Yes |
+| **3** | resonance analysis and anatomy v2 | Yes, plus later fold/skull close-ups and layer toggles |
+| **4** | respiratory-event pipeline | Yes as a provisional heuristic; held-out validation still open |
+| **5** | registration and transition observation | Yes, experimental |
+| **6** | tension-evidence visualization | Yes, experimental |
+| **7** | dataset pipeline and small PyTorch encoder | Specified; not trained in-session |
+| **8** | expressive-intensity ranking | Specified; aura energy stays gated |
+| **9** | personal memory and prototypes | Partial memory UI; learned prototypes not trained |
+| **10** | support-related coordination | Checkbox + evidence path; no diaphragm-truth classifier |
+| **11** | phrase-level temporal model | Not implemented |
+| **12** | optional personal model training | Forbidden during live sessions; offline only |
 
 Each phase has explicit acceptance gates in `RESONANT_MIRROR_V2_CURSOR_IMPLEMENTATION_SPEC.md`.
 
@@ -777,129 +799,23 @@ Do not expose a research-stage output as a trusted feature merely because its in
 
 ---
 
-## Existing repository and legacy prototype
-
-The existing Resonant Singer implementation should be mapped into v2 before architectural changes are made.
-
-Documented legacy modules include:
-
-```text
-src/physics.js
-src/field.js
-src/audio.js
-src/breath.js
-src/anatomy.js
-src/renderer.js
-src/ui.js
-src/views.js
-src/env.js
-src/sessions.js
-src/articulation.js
-src/notices.js
-
-tools/graph_engine/
-tools/synthetic_sessions/
-tools/journal_noticer/
-tools/verify_all.sh
-tools/physics_verify.js
-```
-
-### Legacy behavior that must stay isolated
-
-- hand-tuned anatomical resonance-zone frequencies;
-- coupled-oscillator visualization assumptions;
-- two-source interference geometry;
-- spectral-null presets;
-- the old hard-coded whole-system resonance badge;
-- illustrative register-transition physics.
-
-These may remain useful research visualizations and sandboxes. They must not silently become physiological ground truth, machine-learning labels, or vocal prescriptions.
-
----
-
-## Quick start: current repository
-
-The following commands are retained from the existing project structure.
+## Quick start
 
 ```bash
-# Development server
 npm run serve
-
-# Alternative simple server
-python3 -m http.server 8080
-
-# Existing main tuner
-# http://localhost:8000/index.html
-
-# Resonant Mirror v2 observation UI
-# http://localhost:8000/pages/resonant_mirror_v2.html
-
-# Existing Release Principle sandbox
-# http://localhost:8080/pages/release_principle.html
-```
-
-### Verification
-
-```bash
+# http://localhost:8000/
 ./tools/verify_all.sh
-node tools/physics_verify.js
 ```
 
-Any change touching legacy register physics must continue to satisfy the relevant falsification harness unless the v2 specification deliberately replaces that isolated subsystem and updates its tests.
-
-### Portable legacy build
-
-```bash
-npm run build:dist
-```
-
-### Existing offline graph pipeline
-
-```bash
-cd tools/graph_engine
-python3 ingest.py path/to/sessions.jsonl
-python3 homology.py
-python3 neti_neti.py
-python3 articulate.py
-```
-
-### Existing synthetic machine-learning reference pipeline
-
-```bash
-cd tools/synthetic_sessions
-python3 generate.py -n 4000 --balance -o sessions_balanced.jsonl
-python3 train.py --data sessions_balanced.jsonl
-```
-
-These pipelines are reference infrastructure. New v2 learned systems must follow the v2 dataset, evidence-ancestry, held-out evaluation, and research-gating requirements.
+The observation UI is `index.html`. Analysis and rendering live in `src/v2/`. Offline encoder training lives in `ml/vocal_encoder/`.
 
 ---
 
 ## Documentation map
 
-### Authoritative v2 document
-
-- **`RESONANT_MIRROR_V2_CURSOR_IMPLEMENTATION_SPEC.md`** — complete v2 product and engineering contract.
-
-### Existing architecture and research documents
-
-Where retained:
-
-- `docs/ARCHITECTURE.md`
-- `docs/INTERFERENCE_MODE_DESIGN.md`
-- `docs/AUDIO_PIPELINE_DESIGN.md`
-- `docs/ENGINE_ROADMAP.md`
-- `docs/VERIFICATION.md`
-- `docs/JOURNAL_NOTICER_DESIGN.md`
-- `docs/methodology/README.md`
-- `docs/methodology/assumptions.md`
-- `docs/methodology/active_ignorance_nodes.md`
-- `docs/methodology/isomorphic_mappings.md`
-- `tools/graph_engine/README.md`
-- `vibrational-system.md`
-- `essay-draft.md`
-
-Legacy documentation is useful context. The v2 specification supersedes incompatible product behavior.
+- **`RESONANT_MIRROR_V2_CURSOR_IMPLEMENTATION_SPEC.md`** — product and engineering contract.
+- **`docs/v2/ARCHITECTURE_MAP.md`** — current module map.
+- **`docs/v2/TEST_PLAN.md`** — phase test plan.
 
 ---
 

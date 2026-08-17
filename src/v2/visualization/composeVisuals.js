@@ -5,6 +5,7 @@
 
 import { resolveVisualState, createUnknownVisualState } from './mirrorState.js';
 import { simulatedAirflow } from '../respiration/estimator.js';
+import { snapshotPoseForClass } from '../anatomy/breathKinematics.js';
 import { defaultFeatureFlags } from '../contracts/featureFlags.js';
 
 export function composeVisualStates(frame, {
@@ -33,40 +34,54 @@ export function composeVisualStates(frame, {
     observedAtSeconds: timestampSeconds,
   }));
 
-  const formantOk = (f.formantConfidence || []).some((c) => c > 0.25);
+  const formantOk = (f.formantConfidence || []).some((c) => c > 0.2);
+  const formantClass = frame.provenanceByField?.['features.formantsHertz']?.evidenceClass;
   visuals.push(resolveVisualState({
     visualName: 'formantTrajectories',
     timestampSeconds,
     value: formantOk ? f.formantsHertz : null,
-    evidenceClass: formantOk ? 'derived' : 'unknown',
+    evidenceClass: formantOk
+      ? (formantClass === 'inferred' ? 'inferred' : 'derived')
+      : 'unknown',
     observedAtSeconds: timestampSeconds,
     reliabilityOk: formantOk,
   }));
 
-  const reg = inf.registration || { class: 'unknown', confidence: 0 };
+  const reg = inf.registration || { class: 'unknown', confidence: 0, probabilities: {} };
   visuals.push(registrationVisual('chestRegionGlow', reg, 'chest_dominant', timestampSeconds, flags.registration));
   visuals.push(registrationVisual('skullRimUpperProduction', reg, 'head_dominant', timestampSeconds, flags.registration));
   visuals.push(registrationVisual('mixedCoordinationField', reg, 'mixed', timestampSeconds, flags.registration));
+  if (flags.registration?.enabled && reg.class === 'transition' && reg.transition) {
+    visuals.push(resolveVisualState({
+      visualName: 'registrationTransition',
+      timestampSeconds,
+      value: reg.transition,
+      evidenceClass: 'inferred',
+      confidence: reg.confidence ?? 0.4,
+      observedAtSeconds: timestampSeconds,
+      modelVersion: reg.modelVersion ?? null,
+    }));
+  } else {
+    visuals.push(createUnknownVisualState('registrationTransition', timestampSeconds));
+  }
 
   const resp = inf.respiration || { class: 'unknown', confidence: 0 };
-  const assertiveBreath = flags.respiration?.assertiveVisuals === true;
-  const breathValue = resp.class === 'unknown' || !assertiveBreath && resp.confidence < 0.5
-    ? (assertiveBreath ? resp.class : null)
-    : resp.class;
-  // Until held-out validation, assertive breath visuals stay off.
-  const showBreath = assertiveBreath && resp.class !== 'unknown';
+  const knownBreath = flags.respiration?.enabled && resp.class && resp.class !== 'unknown';
+  const showLane = knownBreath && flags.respiration?.experimentalLanes;
   visuals.push(resolveVisualState({
     visualName: frame.source === 'reference' ? 'breathLaneReference' : 'breathLaneUser',
     timestampSeconds,
-    value: showBreath ? resp.class : null,
-    evidenceClass: showBreath ? 'inferred' : 'unknown',
+    value: showLane ? resp.class : null,
+    evidenceClass: showLane ? 'inferred' : 'unknown',
     confidence: resp.confidence ?? 0,
     observedAtSeconds: timestampSeconds,
     modelVersion: resp.modelVersion ?? null,
-    reliabilityOk: showBreath,
+    reliabilityOk: showLane,
   }));
 
-  const air = simulatedAirflow(showBreath ? resp : { class: 'unknown' });
+  const simulate = knownBreath && flags.respiration?.simulatedAnatomy;
+  const air = simulatedAirflow(simulate ? resp : { class: 'unknown' });
+  const snap = simulate ? snapshotPoseForClass(resp.class) : snapshotPoseForClass('unknown');
   visuals.push(resolveVisualState({
     visualName: 'airflowParticles',
     timestampSeconds,
@@ -78,7 +93,7 @@ export function composeVisualStates(frame, {
   visuals.push(resolveVisualState({
     visualName: 'diaphragmMotion',
     timestampSeconds,
-    value: air.direction == null ? null : (air.direction < 0 ? 0.35 : 0.15),
+    value: air.direction == null ? null : snap.diaphragmDescent,
     evidenceClass: air.direction == null ? 'unknown' : 'simulated',
     observedAtSeconds: timestampSeconds,
     reliabilityOk: air.direction != null,
@@ -86,7 +101,7 @@ export function composeVisualStates(frame, {
   visuals.push(resolveVisualState({
     visualName: 'ribMotion',
     timestampSeconds,
-    value: air.direction == null ? null : (air.direction < 0 ? 0.3 : 0.12),
+    value: air.direction == null ? null : snap.ribExpansion,
     evidenceClass: air.direction == null ? 'unknown' : 'simulated',
     observedAtSeconds: timestampSeconds,
     reliabilityOk: air.direction != null,
@@ -107,7 +122,16 @@ export function composeVisualStates(frame, {
   visuals.push(resolveVisualState({
     visualName: 'throatTensionGlow',
     timestampSeconds,
-    value: tensionOk ? tension.regions.throat ?? tension.global : null,
+    value: tensionOk ? Math.max(tension.regions.throat ?? 0, tension.regions.neck ?? 0) : null,
+    evidenceClass: tensionOk ? 'inferred' : 'unknown',
+    confidence: tension.confidence ?? 0,
+    observedAtSeconds: timestampSeconds,
+    reliabilityOk: tensionOk,
+  }));
+  visuals.push(resolveVisualState({
+    visualName: 'torsoTensionGlow',
+    timestampSeconds,
+    value: tensionOk ? tension.regions.upper_torso ?? tension.global * 0.3 : null,
     evidenceClass: tensionOk ? 'inferred' : 'unknown',
     confidence: tension.confidence ?? 0,
     observedAtSeconds: timestampSeconds,
@@ -134,18 +158,31 @@ export function composeVisualStates(frame, {
     reliabilityOk: intensityOk,
   }));
 
+  const support = inf.supportEvidence;
+  const supportOk = flags.supportEvidence?.enabled && support?.value != null;
+  visuals.push(resolveVisualState({
+    visualName: 'supportEvidence',
+    timestampSeconds,
+    value: supportOk ? support.value : null,
+    evidenceClass: supportOk ? (support.evidenceClass || 'inferred') : 'unknown',
+    observedAtSeconds: timestampSeconds,
+    reliabilityOk: supportOk,
+  }));
+
   return visuals;
 }
 
 function registrationVisual(name, reg, matchClass, timestampSeconds, flag) {
-  const enabled = flag?.enabled && reg.class === matchClass;
+  const p = reg.probabilities?.[matchClass]
+    ?? (reg.class === matchClass ? (reg.confidence || 0) : 0);
+  const enabled = flag?.enabled && reg.class && reg.class !== 'unknown' && p > 0.18;
   if (!enabled) return createUnknownVisualState(name, timestampSeconds);
   return resolveVisualState({
     visualName: name,
     timestampSeconds,
-    value: reg.confidence,
+    value: p,
     evidenceClass: 'inferred',
-    confidence: reg.confidence,
+    confidence: Math.min(reg.confidence ?? p, p),
     observedAtSeconds: timestampSeconds,
     modelVersion: reg.modelVersion ?? null,
   });

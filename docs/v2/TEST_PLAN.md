@@ -41,7 +41,9 @@ python3 tests/v2/test_ml_pipeline.py
 
 - Formant estimates carry confidence and may be `unknown`.
 - High-F0 frames are allowed to return unknown formants.
+- LPC failure may fall back to smoothed spectral peaks as `inferred`.
 - Anatomy motion is tagged `simulated` without a body sensor.
+- Mouth aperture follows F1 or scream acoustics; it is not a single phonated preset. Open vowels and screams use a much larger visual jaw/lip range than rest or /i/.
 - Skull-rim mapping is `inferred` or `simulated`, never cavity proof.
 
 ## Phase 4 — Respiration

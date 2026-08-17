@@ -10,12 +10,17 @@ import { chamberResonanceFromFormants } from '../resonance/chamberResonance.js';
 import { tractConfigurationFromFormants } from '../resonance/tractShape.js';
 import { mouthArticulationFromAcoustics } from '../resonance/mouthArticulation.js';
 import { inferTechniqueCandidate } from './vocalFoldState.js';
+import { breathPlumeScale, soundFieldAttenuation } from './soundField.js';
 import {
-  CHEST_CHAMBER_RGB,
+  AIRFLOW_RGB,
+  BONE_RGB,
   CHEST_VOICE_RGB,
   HEAD_VOICE_RGB,
+  MUSCLE_RGB,
+  OUTLINE_RGB,
   SKULL_CHAMBER_RGB,
   THROAT_CHAMBER_RGB,
+  TRACT_RGB,
   mixedSystemVibration,
   registerVoiceAmounts,
   rgbaVoice,
@@ -43,6 +48,33 @@ export function nextSkullZoom(current, deltaY) {
 
 export function nextSkullYaw(current, dxPixels) {
   return Math.max(-1.15, Math.min(1.15, (Number(current) || 0) + dxPixels * 0.008));
+}
+
+/** Local sagittal landmarks used to seat the shared head on the figure. */
+export const SAGITTAL_LOCAL = Object.freeze({
+  vaultY: -186,
+  baseY: 52,
+  spineX: -8,
+  occiputX: -128,
+  faceX: 152,
+  larynxY: 162,
+});
+
+/**
+ * Camera that maps sagittal local coordinates onto the figure skull:
+ * vault to the cranial vault, occiput/base onto the neck, midline onto the spine.
+ */
+export function sagittalCameraForFigure(layout) {
+  const vaultTop = layout.skull.y - layout.skull.ry;
+  const baseY = layout.neck.y0;
+  const S = (baseY - vaultTop) / (SAGITTAL_LOCAL.baseY - SAGITTAL_LOCAL.vaultY);
+  return {
+    S,
+    cx: layout.cx - SAGITTAL_LOCAL.spineX * S,
+    cy: vaultTop - SAGITTAL_LOCAL.vaultY * S,
+    vaultTop,
+    baseY,
+  };
 }
 
 /** Mid-sagittal (x, y) stays rigid; only lateral z creates parallax. */
@@ -310,7 +342,7 @@ export function closeupAirflowParticles({
         t,
         lane,
         inbound: localDir < 0,
-        alpha: 0.5 + 0.5 * Math.sin(phase * Math.PI) * Math.max(0.5, drive) * share,
+        alpha: soundFieldAttenuation(t) * (0.28 + 0.32 * Math.max(0.5, drive) * share),
         radius: path === 'nasal' ? 1.6 + drive * 1.4 : 1.8 + drive * 1.8,
         streak: 0.04 + drive * 0.03,
       });
@@ -347,8 +379,8 @@ export function mouthEmissionParticles({
       path: 'oralJet',
       t,
       lane: ((i % 7) - 3) / 3,
-      alpha: (1 - t * 0.72) * (0.4 + drive * 0.7) * (holding ? 0.75 : 1),
-      radius: 2.2 + drive * 2.4,
+      alpha: soundFieldAttenuation(t) * (0.55 + drive * 0.42) * (holding ? 0.8 : 1),
+      radius: 2.4 + drive * 2.6,
       phonated,
       inbound,
     });
@@ -361,8 +393,8 @@ export function mouthEmissionParticles({
       path: 'nasalJet',
       t,
       lane: ((i % 5) - 2) / 2.5,
-      alpha: (1 - t * 0.65) * (0.45 + drive * 0.6) * (holding ? 0.75 : 1),
-      radius: 2.2 + drive * 1.8,
+      alpha: soundFieldAttenuation(t) * (0.48 + drive * 0.38) * (holding ? 0.8 : 1),
+      radius: 2.2 + drive * 2.0,
       phonated: false,
       inbound,
     });
@@ -399,8 +431,8 @@ export function exteriorCloseupParticles({
       out.push({
         x: pt.x,
         y: pt.y,
-        alpha: 0.22 + 0.55 * Math.sin(phase * Math.PI) * drive,
-        radius: 1.6 + (i % 4) * 0.7 + drive * 0.8,
+        alpha: soundFieldAttenuation(t) * (0.28 + 0.42 * drive),
+        radius: (1.8 + (i % 4) * 0.7 + drive * 0.8) * breathPlumeScale(t),
       });
     }
   }
@@ -425,7 +457,8 @@ export function nasalCavityWaypoints() {
 }
 
 export function oralCavityWaypoints(jawDrop = 0.12, mouthOpen = 0.12) {
-  const lips = jawRotatedPoint(152, 28 + clamp(mouthOpen) * 12, jawDrop);
+  const open = clamp(mouthOpen);
+  const lips = { x: 152, y: 28 + open * 12 };
   return [
     [14, 162],
     [16, 128],
@@ -434,7 +467,7 @@ export function oralCavityWaypoints(jawDrop = 0.12, mouthOpen = 0.12) {
     [48, 20],
     [88, 16],
     [126, 18],
-    [lips.x, Math.max(20, lips.y - 8)],
+    [lips.x, lips.y],
   ];
 }
 
@@ -455,6 +488,7 @@ export function drawSagittalHead(ctx, W, H, state, timeMs = 0, {
   compact = false,
   originX = 0,
   originY = 0,
+  camera = null,
 } = {}) {
   ctx.save();
   ctx.translate(originX, originY);
@@ -464,7 +498,7 @@ export function drawSagittalHead(ctx, W, H, state, timeMs = 0, {
     lipSpread: state.lipSpread,
     jawRetract: state.jawRetract,
     headTuck: state.headTuck,
-  });
+  }, camera);
   const rgb = hexToRgb(state.pitchColor);
   const formants = state.formantsHertz || [];
 
@@ -493,7 +527,7 @@ export function drawSagittalHead(ctx, W, H, state, timeMs = 0, {
   ctx.restore();
 }
 
-function closeupLayout(W, H, yaw, zoom, pose = {}) {
+function closeupLayout(W, H, yaw, zoom, pose = {}, camera = null) {
   const mouthOpen = pose.mouthOpen ?? 0.12;
   const jawDrop = pose.jawDrop ?? 0.12;
   const lipSpread = clamp(pose.lipSpread ?? 0.35);
@@ -501,9 +535,9 @@ function closeupLayout(W, H, yaw, zoom, pose = {}) {
   const headTuck = clamp(pose.headTuck ?? 0);
   const localW = 420;
   const localH = 520;
-  const S = Math.min(W / localW, H / localH) * 0.88 * zoom;
-  const cx = W * 0.42;
-  const cy = H * 0.50;
+  const S = camera?.S ?? (Math.min(W / localW, H / localH) * 0.88 * zoom);
+  const cx = camera?.cx ?? (W * 0.42);
+  const cy = camera?.cy ?? (H * 0.50);
   const tmj = { x: -24, y: 10 };
   const pivot = { x: -18, y: 92 };
   const tuck = headTuck * 0.38;
@@ -551,12 +585,12 @@ function closeupLayout(W, H, yaw, zoom, pose = {}) {
 
 function drawVault(ctx, L) {
   const { p, S } = L;
-  const bone = ctx.createRadialGradient(p(12, -80).x, p(12, -80).y, 24 * S, L.cx, L.cy, 260 * S);
+  const bone = ctx.createRadialGradient(p(12, -80).x, p(12, -80).y, 24 * S, L.cx, L.cy, 118 * S);
   bone.addColorStop(0, 'rgba(228,220,204,0.5)');
   bone.addColorStop(0.55, 'rgba(148,142,128,0.3)');
   bone.addColorStop(1, 'rgba(48,54,58,0.16)');
   ctx.fillStyle = bone;
-  ctx.strokeStyle = 'rgba(226,224,214,0.78)';
+  ctx.strokeStyle = rgbaVoice(OUTLINE_RGB, 0.9);
   ctx.lineWidth = 2.4 * S;
   ctx.beginPath();
   ctx.moveTo(p(-88, 52).x, p(-88, 52).y);
@@ -571,7 +605,7 @@ function drawVault(ctx, L) {
   ctx.closePath();
   ctx.fill();
   ctx.stroke();
-  ctx.strokeStyle = 'rgba(200,206,198,0.3)';
+  ctx.strokeStyle = rgbaVoice(OUTLINE_RGB, 0.28);
   ctx.lineWidth = 1 * S;
   ctx.beginPath();
   ctx.moveTo(p(-6, -150).x, p(-6, -150).y);
@@ -613,13 +647,13 @@ function drawRegisterVoiceCloseup(ctx, L, state = {}) {
       ctx.ellipse(vault.x, vault.y, 96 * L.S, 82 * L.S, -0.08, 0, Math.PI * 2);
       ctx.clip();
       const g = ctx.createRadialGradient(vault.x, vault.y, 8 * L.S, vault.x, vault.y, 96 * L.S);
-      g.addColorStop(0, rgbaVoice(SKULL_CHAMBER_RGB, a));
-      g.addColorStop(0.7, rgbaVoice(SKULL_CHAMBER_RGB, a * 0.28));
-      g.addColorStop(1, rgbaVoice(SKULL_CHAMBER_RGB, 0));
+      g.addColorStop(0, rgbaVoice(HEAD_VOICE_RGB, a));
+      g.addColorStop(0.7, rgbaVoice(HEAD_VOICE_RGB, a * 0.28));
+      g.addColorStop(1, rgbaVoice(HEAD_VOICE_RGB, 0));
       ctx.fillStyle = g;
       ctx.fillRect(vault.x - 110 * L.S, vault.y - 96 * L.S, 220 * L.S, 192 * L.S);
       ctx.restore();
-      ctx.strokeStyle = rgbaVoice(SKULL_CHAMBER_RGB, 0.4 + 0.5 * head);
+      ctx.strokeStyle = rgbaVoice(HEAD_VOICE_RGB, 0.4 + 0.5 * head);
       ctx.lineWidth = 2.4 * L.S;
       ctx.beginPath();
       ctx.ellipse(vault.x, vault.y - 4 * L.S, 100 * L.S, 86 * L.S, -0.08, Math.PI * 1.08, Math.PI * 1.92);
@@ -677,7 +711,7 @@ function drawMixedCloseupVibration(ctx, L, state, timeMs) {
     L.p(18, -78),
   ];
   ctx.save();
-  ctx.globalCompositeOperation = 'lighter';
+    ctx.globalCompositeOperation = 'source-over';
   ctx.strokeStyle = rgba(rgb, 0.18 + vib.amount * 0.42 * pulse);
   ctx.lineWidth = (2.2 + vib.amount * 4.5 * pulse) * L.S;
   ctx.lineJoin = 'round';
@@ -711,13 +745,13 @@ function drawSinuses(ctx, L, formants, energy, timeMs) {
   const glow = energy > 0.04 ? 0.08 + 0.38 * wave : 0;
   fillChamber(ctx, L, [
     [36, -118], [72, -126], [88, -102], [64, -84], [32, -92],
-  ], `rgba(90,196,220,${0.14 + glow})`, 'rgba(120,214,230,0.5)');
+  ], rgbaVoice(SKULL_CHAMBER_RGB, 0.16 + glow), rgbaVoice(SKULL_CHAMBER_RGB, 0.55));
   fillChamber(ctx, L, [
     [2, -24], [22, -28], [28, -8], [12, 6], [-2, 2],
-  ], `rgba(80,170,200,${0.12 + glow * 0.7})`, 'rgba(110,200,220,0.42)');
+  ], rgbaVoice(SKULL_CHAMBER_RGB, 0.12 + glow * 0.7), rgbaVoice(SKULL_CHAMBER_RGB, 0.42));
   fillChamber(ctx, L, [
     [48, -18], [70, -16], [74, 4], [52, 10], [42, -2],
-  ], `rgba(70,150,180,${0.08 + glow * 0.4})`, 'rgba(110,190,210,0.32)');
+  ], rgbaVoice(SKULL_CHAMBER_RGB, 0.1 + glow * 0.4), rgbaVoice(SKULL_CHAMBER_RGB, 0.36));
 }
 
 function traceNasalLumen(ctx, L) {
@@ -737,18 +771,18 @@ function drawNasalCavity(ctx, L, formants, energy, timeMs, state) {
     ? cavityStandingWave({ s: 0.45, timeMs, formantHertz: f3, energy, harmonic: 2 })
     : 0;
   const nasal = 0.08 + state.nasalShare * 0.12 + energy * 0.45 + Math.abs(wave) * 0.3 + (state.nasalFlow || 0) * 0.12;
-  ctx.fillStyle = `rgba(8, 28, 38, ${0.72 + nasal * 0.2})`;
-  ctx.strokeStyle = 'rgba(120,224,240,0.92)';
+  ctx.fillStyle = `rgba(8, 18, 28, ${0.62 + nasal * 0.2})`;
+  ctx.strokeStyle = rgbaVoice(TRACT_RGB, 0.7);
   ctx.lineWidth = 2.2 * L.S;
   traceNasalLumen(ctx, L);
   ctx.fill();
   ctx.stroke();
-  ctx.fillStyle = `rgba(48, 140, 168, ${0.16 + nasal})`;
+  ctx.fillStyle = rgbaVoice(SKULL_CHAMBER_RGB, 0.18 + nasal * 0.32);
   traceNasalLumen(ctx, L);
   ctx.fill();
 
-  ctx.fillStyle = 'rgba(198, 148, 150, 0.55)';
-  ctx.strokeStyle = 'rgba(236, 196, 196, 0.55)';
+  ctx.fillStyle = rgbaVoice(TRACT_RGB, 0.22);
+  ctx.strokeStyle = rgbaVoice(TRACT_RGB, 0.48);
   ctx.lineWidth = 1.3 * L.S;
   for (const [sx, sy, ex, ey, drop] of [
     [96, 6, 38, 2, 10],
@@ -771,7 +805,7 @@ function drawNasalCavity(ctx, L, formants, energy, timeMs, state) {
     ctx.stroke();
   }
 
-  ctx.strokeStyle = 'rgba(232,226,210,0.92)';
+  ctx.strokeStyle = rgbaVoice(BONE_RGB, 0.9);
   ctx.lineWidth = 4.4 * L.S;
   ctx.lineCap = 'round';
   ctx.beginPath();
@@ -781,7 +815,7 @@ function drawNasalCavity(ctx, L, formants, energy, timeMs, state) {
 
   const narisOpen = 4 + (state.nasalFlow || 0) * 8;
   ctx.fillStyle = `rgba(6,18,24,${0.78 + (state.nasalFlow || 0) * 0.18})`;
-  ctx.strokeStyle = 'rgba(140,220,240,0.9)';
+  ctx.strokeStyle = rgbaVoice(TRACT_RGB, 0.7);
   ctx.beginPath();
   ctx.ellipse(L.naris.x, L.naris.y, 8 * L.S, narisOpen * L.S, 0.18, 0, Math.PI * 2);
   ctx.fill();
@@ -839,8 +873,8 @@ function drawOralCavity(ctx, L, formants, energy, timeMs, state) {
 }
 
 function drawHardPalate(ctx, L) {
-  ctx.fillStyle = 'rgba(214,208,192,0.42)';
-  ctx.strokeStyle = 'rgba(232,226,210,0.9)';
+  ctx.fillStyle = rgbaVoice(BONE_RGB, 0.28);
+  ctx.strokeStyle = rgbaVoice(BONE_RGB, 0.88);
   ctx.lineWidth = 2.2 * L.S;
   ctx.beginPath();
   ctx.moveTo(L.p(106, 10).x, L.p(106, 10).y);
@@ -863,8 +897,8 @@ function drawHardPalate(ctx, L) {
 
 function drawSoftPalate(ctx, L, state) {
   const drop = 4 + (1 - (state.nasalShare || 0.18)) * 16;
-  ctx.fillStyle = 'rgba(196,108,118,0.58)';
-  ctx.strokeStyle = 'rgba(236,168,168,0.8)';
+  ctx.fillStyle = rgbaVoice(TRACT_RGB, 0.42);
+  ctx.strokeStyle = rgbaVoice(TRACT_RGB, 0.7);
   ctx.lineWidth = 1.6 * L.S;
   ctx.beginPath();
   ctx.moveTo(L.p(24, 12).x, L.p(24, 12).y);
@@ -873,7 +907,7 @@ function drawSoftPalate(ctx, L, state) {
   ctx.closePath();
   ctx.fill();
   ctx.stroke();
-  ctx.fillStyle = 'rgba(186,96,108,0.72)';
+  ctx.fillStyle = rgbaVoice(TRACT_RGB, 0.55);
   ctx.beginPath();
   ctx.moveTo(L.p(-2, 28 + drop).x, L.p(-2, 28 + drop).y);
   ctx.quadraticCurveTo(L.p(-8, 42 + drop).x, L.p(-8, 42 + drop).y, L.p(-1, 50 + drop).x, L.p(-1, 50 + drop).y);
@@ -927,8 +961,8 @@ function drawTongue(ctx, L, state) {
   const layers = Math.abs(L.yaw) > 0.06 ? (L.yaw >= 0 ? [L.farZ, 0, -L.farZ] : [-L.farZ, 0, L.farZ]) : [0];
   for (const z of layers) {
     const midline = z === 0;
-    ctx.fillStyle = midline ? 'rgba(196,96,108,0.8)' : `rgba(168,78,92,${0.28 + Math.abs(Math.sin(L.yaw)) * 0.22})`;
-    ctx.strokeStyle = midline ? 'rgba(236,168,168,0.8)' : 'rgba(214,140,148,0.4)';
+    ctx.fillStyle = midline ? rgbaVoice(MUSCLE_RGB, 0.72) : rgbaVoice(MUSCLE_RGB, 0.28 + Math.abs(Math.sin(L.yaw)) * 0.22);
+    ctx.strokeStyle = midline ? rgbaVoice(MUSCLE_RGB, 0.85) : rgbaVoice(MUSCLE_RGB, 0.4);
     ctx.lineWidth = (midline ? 1.6 : 1.05) * L.S;
     traceTongue(ctx, L, shape, z);
     ctx.fill();
@@ -938,14 +972,14 @@ function drawTongue(ctx, L, state) {
   const blade = L.p(shape.blade[0], shape.blade[1], 0);
   const tip = L.p(shape.tip[0], shape.tip[1], 0);
   const root = L.p(shape.root[0], shape.root[1], 0);
-  ctx.strokeStyle = 'rgba(255,214,214,0.45)';
+  ctx.strokeStyle = rgbaVoice(MUSCLE_RGB, 0.4);
   ctx.lineWidth = 1.15 * L.S;
   ctx.beginPath();
   ctx.moveTo(root.x, root.y);
   ctx.quadraticCurveTo(dorsum.x, dorsum.y - 3 * L.S, blade.x, blade.y);
   ctx.quadraticCurveTo(tip.x - 6 * L.S, tip.y - 4 * L.S, tip.x, tip.y);
   ctx.stroke();
-  ctx.fillStyle = 'rgba(255,188,188,0.35)';
+  ctx.fillStyle = rgbaVoice(MUSCLE_RGB, 0.28);
   for (let i = 0; i < 7; i++) {
     const pt = L.p(
       shape.blade[0] + (shape.tip[0] - shape.blade[0]) * (i / 6) - 4,
@@ -956,7 +990,7 @@ function drawTongue(ctx, L, state) {
     ctx.arc(pt.x, pt.y, (1.1 + (i % 2) * 0.4) * L.S, 0, Math.PI * 2);
     ctx.fill();
   }
-  ctx.fillStyle = 'rgba(220,120,128,0.7)';
+  ctx.fillStyle = rgbaVoice(MUSCLE_RGB, 0.62);
   ctx.beginPath();
   ctx.ellipse(tip.x, tip.y, 7.5 * L.S, 4.2 * L.S, 0.15, 0, Math.PI * 2);
   ctx.fill();
@@ -975,11 +1009,7 @@ function drawMouth(ctx, L, state) {
   drawTeeth(ctx, L);
   drawLips(ctx, L);
   if (flowing && L.mouthOpen > 0.08) {
-    ctx.fillStyle = state.flowDirection < 0
-      ? `rgba(170,230,255,${0.14 + (state.oralFlow || 0) * 0.35})`
-      : state.phonated
-        ? `rgba(255,224,140,${0.14 + state.energy * 0.3})`
-        : `rgba(170,230,255,${0.12 + (state.oralFlow || 0) * 0.3})`;
+    ctx.fillStyle = rgbaVoice(AIRFLOW_RGB, 0.12 + (state.oralFlow || 0) * 0.32);
     ctx.beginPath();
     ctx.ellipse(L.lips.x, L.lips.y, (16 + L.mouthOpen * 18) * L.S, Math.max(5, (L.lowerLip.y - L.upperLip.y) * 0.42), 0, 0, Math.PI * 2);
     ctx.fill();
@@ -1053,7 +1083,7 @@ function drawPharynx(ctx, L, formants, energy, timeMs, state = {}) {
   const fill = 0.08 + energy * 0.45 + Math.abs(wave) * 0.3;
   const pinch = clamp(state.supraglotticNarrowing || 0);
   const wide = clamp(state.pharynxWide ?? 0.45);
-  const open = (wide - pinch * 0.7) * 32;
+  const open = (wide - pinch * 0.7) * (38 + clamp(state.mouthOpen) * 36);
   ctx.fillStyle = `rgba(${THROAT_CHAMBER_RGB.r},${THROAT_CHAMBER_RGB.g},${THROAT_CHAMBER_RGB.b},${0.12 + fill * 0.55})`;
   ctx.strokeStyle = rgbaVoice(THROAT_CHAMBER_RGB, 0.72 + energy * 0.22);
   ctx.lineWidth = (2.4 + energy * 1.6) * L.S;
@@ -1077,8 +1107,8 @@ function drawPharynx(ctx, L, formants, energy, timeMs, state = {}) {
 
 function drawLarynx(ctx, L, state, timeMs) {
   const open = state.phonated ? 0.28 : 0.7;
-  ctx.fillStyle = 'rgba(210,150,110,0.35)';
-  ctx.strokeStyle = 'rgba(255,210,150,0.7)';
+  ctx.fillStyle = rgbaVoice(TRACT_RGB, 0.28);
+  ctx.strokeStyle = rgbaVoice(TRACT_RGB, 0.72);
   ctx.lineWidth = 1.4 * L.S;
   ctx.beginPath();
   ctx.moveTo(L.p(-8, 126).x, L.p(-8, 126).y);
@@ -1091,7 +1121,7 @@ function drawLarynx(ctx, L, state, timeMs) {
   const wiggle = state.phonated && state.frequencyHertz
     ? Math.sin(timeMs * 0.001 * Math.max(1.6, Math.min(14, state.frequencyHertz / 48)) * Math.PI * 2) * 1.4
     : 0;
-  ctx.strokeStyle = state.phonated ? 'rgba(255,224,122,0.95)' : 'rgba(255,200,140,0.65)';
+  ctx.strokeStyle = rgbaVoice(AIRFLOW_RGB, state.phonated ? 0.9 : 0.45);
   ctx.lineWidth = 1.7 * L.S;
   ctx.beginPath();
   ctx.moveTo(L.p(0, 136 - open * 8 + wiggle).x, L.p(0, 136 - open * 8 + wiggle).y);
@@ -1104,25 +1134,43 @@ function drawLarynx(ctx, L, state, timeMs) {
 function drawEar(ctx, L, state = {}) {
   const e = L.ear;
   const sensation = clamp(state.headSensationAmount || state.headLoopAmount || 0);
+  const inner = L.p(10, 36);
+  ctx.strokeStyle = rgbaVoice(SKULL_CHAMBER_RGB, 0.42 + sensation * 0.4);
+  ctx.lineWidth = (3.4 + sensation * 2.2) * L.S;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(e.x, e.y);
+  ctx.quadraticCurveTo(L.p(-18, 22).x, L.p(-18, 22).y, inner.x, inner.y);
+  ctx.stroke();
+  ctx.strokeStyle = rgbaVoice(SKULL_CHAMBER_RGB, 0.22 + sensation * 0.25);
+  ctx.lineWidth = 1.4 * L.S;
+  ctx.beginPath();
+  ctx.moveTo(e.x + 2 * L.S, e.y + 4 * L.S);
+  ctx.quadraticCurveTo(L.p(-10, 28).x, L.p(-10, 28).y, inner.x + 3 * L.S, inner.y + 4 * L.S);
+  ctx.stroke();
   ctx.fillStyle = 'rgba(4,10,14,0.88)';
   ctx.strokeStyle = sensation > 0.12
-    ? rgbaVoice(SKULL_CHAMBER_RGB, 0.55 + sensation * 0.4)
-    : 'rgba(170,198,210,0.7)';
+    ? rgbaVoice(SKULL_CHAMBER_RGB, 0.7 + sensation * 0.3)
+    : rgbaVoice(OUTLINE_RGB, 0.7);
   ctx.lineWidth = (1.4 + sensation * 1.2) * L.S;
   ctx.beginPath();
   ctx.ellipse(e.x, e.y, 9 * L.S, 14 * L.S, 0, 0, Math.PI * 2);
   ctx.fill();
   ctx.stroke();
   ctx.strokeStyle = sensation > 0.12
-    ? rgbaVoice(SKULL_CHAMBER_RGB, 0.35 + sensation * 0.45)
-    : 'rgba(130,170,188,0.45)';
+    ? rgbaVoice(SKULL_CHAMBER_RGB, 0.45 + sensation * 0.4)
+    : rgbaVoice(OUTLINE_RGB, 0.4);
   ctx.beginPath();
   ctx.ellipse(e.x - 2 * L.S, e.y, 4 * L.S, 7 * L.S, 0, 0, Math.PI * 2);
   ctx.stroke();
-  if (sensation > 0.12 && state.phonated) {
+  ctx.fillStyle = rgbaVoice(SKULL_CHAMBER_RGB, 0.35 + sensation * 0.4);
+  ctx.beginPath();
+  ctx.arc(inner.x, inner.y, (3.2 + sensation * 2.4) * L.S, 0, Math.PI * 2);
+  ctx.fill();
+  if (sensation > 0.08 && state.phonated) {
     const glow = ctx.createRadialGradient(e.x, e.y, 1 * L.S, e.x, e.y, 22 * L.S);
     glow.addColorStop(0, rgbaVoice(SKULL_CHAMBER_RGB, 0.22 + sensation * 0.35));
-    glow.addColorStop(1, 'rgba(72,196,255,0)');
+    glow.addColorStop(1, rgbaVoice(SKULL_CHAMBER_RGB, 0));
     ctx.fillStyle = glow;
     ctx.beginPath();
     ctx.arc(e.x, e.y, 22 * L.S, 0, Math.PI * 2);
@@ -1131,8 +1179,8 @@ function drawEar(ctx, L, state = {}) {
 }
 
 function drawMandible(ctx, L) {
-  ctx.fillStyle = 'rgba(210,204,188,0.28)';
-  ctx.strokeStyle = 'rgba(228,222,208,0.88)';
+  ctx.fillStyle = rgbaVoice(BONE_RGB, 0.22);
+  ctx.strokeStyle = rgbaVoice(BONE_RGB, 0.82);
   ctx.lineWidth = 2.6 * L.S;
   ctx.beginPath();
   ctx.moveTo(L.jawP(-24, 10).x, L.jawP(-24, 10).y);
@@ -1152,7 +1200,7 @@ function drawMandible(ctx, L) {
 function drawOrbit(ctx, L) {
   const o = L.p(58, -46, 16);
   ctx.fillStyle = 'rgba(6,10,16,0.9)';
-  ctx.strokeStyle = 'rgba(226,222,210,0.85)';
+  ctx.strokeStyle = rgbaVoice(BONE_RGB, 0.8);
   ctx.lineWidth = 3.2 * L.S;
   ctx.beginPath();
   ctx.ellipse(o.x, o.y, 30 * L.S, 22 * L.S, 0.08, 0, Math.PI * 2);
@@ -1224,20 +1272,20 @@ function drawAirColumns(ctx, L, state, timeMs) {
     energy: state.energy,
     frequencyHertz: state.frequencyHertz || 0,
   });
-  const oralRgb = state.phonated ? hexToRgb(state.pitchColor) : { r: 170, g: 230, b: 255 };
-  const nasalRgb = { r: 90, g: 220, b: 255 };
+  const oralRgb = AIRFLOW_RGB;
+  const nasalRgb = AIRFLOW_RGB;
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
   ctx.save();
   traceNasalAirway(ctx, L);
   ctx.clip();
-  drawStreamTube(ctx, L, (layout, t) => nasalPathPoint(layout, t), nasalRgb, 7 * L.S, 0.28 + (state.nasalFlow || state.nasalShare) * 0.35);
+  drawStreamTube(ctx, L, (layout, t) => nasalPathPoint(layout, t), nasalRgb, 7 * L.S, 0.42 + (state.nasalFlow || state.nasalShare) * 0.4);
   drawParticleSet(ctx, L, particles.filter((p) => p.path === 'nasal'), nasalPathPoint, nasalRgb, 3.2 * L.S);
   ctx.restore();
   ctx.save();
   traceOralLumen(ctx, L);
   ctx.clip();
-  drawStreamTube(ctx, L, (layout, t) => oralPathPoint(layout, t), oralRgb, 3.2 * L.S, 0.18 + (state.oralFlow || state.energy) * 0.28);
+  drawStreamTube(ctx, L, (layout, t) => oralPathPoint(layout, t), oralRgb, 4.2 * L.S, 0.32 + (state.oralFlow || state.energy) * 0.38);
   drawParticleSet(ctx, L, particles.filter((p) => p.path === 'oral'), (layout, t) => oralPathPoint(layout, t), oralRgb, 2.2 * L.S);
   ctx.restore();
   ctx.restore();
@@ -1279,11 +1327,11 @@ function drawParticleSet(ctx, L, particles, sampler, rgb, laneScale) {
     ctx.moveTo(pt.x, pt.y);
     ctx.lineTo(ahead.x, ahead.y);
     ctx.stroke();
-    ctx.fillStyle = rgba(rgb, Math.min(1, p.alpha * 0.55));
+    ctx.fillStyle = rgba(rgb, Math.min(0.45, p.alpha * 0.5));
     ctx.beginPath();
-    ctx.arc(pt.x, pt.y, p.radius * L.S * 1.15, 0, Math.PI * 2);
+    ctx.arc(pt.x, pt.y, p.radius * L.S * 1.05, 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillStyle = rgba({ r: 255, g: 255, b: 255 }, Math.min(0.95, p.alpha));
+    ctx.fillStyle = rgba(rgb, Math.min(0.18, p.alpha * 0.22));
     ctx.beginPath();
     ctx.arc(pt.x, pt.y, p.radius * L.S * 0.4, 0, Math.PI * 2);
     ctx.fill();
@@ -1326,13 +1374,13 @@ function drawExteriorAir(ctx, L, state, timeMs, alphaScale = 1) {
   ctx.globalCompositeOperation = 'lighter';
   for (const p of particles) {
     const pt = L.p(p.x, p.y);
-    ctx.fillStyle = rgba({ r: 170, g: 230, b: 255 }, p.alpha * 0.82 * alphaScale);
+    ctx.fillStyle = rgba(AIRFLOW_RGB, p.alpha * 0.95 * alphaScale);
     ctx.beginPath();
-    ctx.arc(pt.x, pt.y, p.radius * L.S * 1.35, 0, Math.PI * 2);
+    ctx.arc(pt.x, pt.y, p.radius * L.S * 1.15, 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillStyle = rgba({ r: 255, g: 255, b: 255 }, p.alpha * 0.55 * alphaScale);
+    ctx.fillStyle = rgba(AIRFLOW_RGB, p.alpha * 0.2 * alphaScale);
     ctx.beginPath();
-    ctx.arc(pt.x, pt.y, p.radius * L.S * 0.35, 0, Math.PI * 2);
+    ctx.arc(pt.x, pt.y, p.radius * L.S * 0.28, 0, Math.PI * 2);
     ctx.fill();
   }
   ctx.restore();
@@ -1352,35 +1400,39 @@ function drawMouthEmission(ctx, L, state, timeMs, rgb) {
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
   if (drive > 0.08 && Math.abs(state.flowDirection) > 0.12) {
-    const outX = L.lips.x + 210 * L.S;
-    const fromX = state.flowDirection < 0 ? outX : L.lips.x;
-    const toX = state.flowDirection < 0 ? L.lips.x : outX;
+    const reach = Math.max(L.W * 0.7, 420 * L.S);
+    const outX = L.lips.x + reach;
+    const inbound = state.flowDirection < 0;
+    const fromX = inbound ? outX : L.lips.x;
+    const toX = inbound ? L.lips.x : outX;
     const mist = ctx.createLinearGradient(fromX, L.lips.y, toX, L.lips.y + 8 * L.S);
-    mist.addColorStop(0, rgba(state.phonated ? rgb : { r: 180, g: 235, b: 255 }, 0.28 + drive * 0.35));
-    mist.addColorStop(1, 'rgba(180,235,255,0)');
+    mist.addColorStop(0, rgba(AIRFLOW_RGB, inbound ? 0.05 : 0.32 + drive * 0.22));
+    mist.addColorStop(0.4, rgba(AIRFLOW_RGB, inbound ? 0.12 : 0.1));
+    mist.addColorStop(1, rgba(AIRFLOW_RGB, inbound ? 0.28 + drive * 0.18 : 0));
     ctx.fillStyle = mist;
     ctx.beginPath();
     ctx.moveTo(L.lips.x, L.lips.y - 10 * L.S);
-    ctx.lineTo(L.lips.x + 210 * L.S, L.lips.y - (32 + drive * 40) * L.S);
-    ctx.lineTo(L.lips.x + 210 * L.S, L.lips.y + (26 + drive * 32) * L.S);
+    ctx.lineTo(L.lips.x + reach, L.lips.y - (48 + drive * 64) * L.S);
+    ctx.lineTo(L.lips.x + reach, L.lips.y + (40 + drive * 52) * L.S);
     ctx.lineTo(L.lips.x, L.lips.y + 12 * L.S);
     ctx.closePath();
     ctx.fill();
   }
+  const travel = Math.max(L.W * 0.7, 420 * L.S);
   for (const p of particles) {
     const origin = p.path === 'nasalJet' ? L.naris : L.lips;
     const lift = p.path === 'nasalJet' ? -32 : 8;
-    const spread = (p.lane || 0) * (22 + p.t * 44) * L.S;
-    const x = origin.x + p.t * 230 * L.S;
+    const spread = (p.lane || 0) * (24 + p.t * 96) * L.S;
+    const x = origin.x + p.t * travel;
     const y = origin.y + p.t * lift * L.S + spread;
-    const color = p.phonated ? rgb : { r: 170, g: 230, b: 255 };
-    ctx.fillStyle = rgba(color, p.alpha * 0.55);
+    const r = p.radius * L.S * breathPlumeScale(p.t);
+    ctx.fillStyle = rgba(AIRFLOW_RGB, Math.min(0.95, p.alpha));
     ctx.beginPath();
-    ctx.arc(x, y, p.radius * L.S * (1.15 + p.t * 1.5), 0, Math.PI * 2);
+    ctx.arc(x, y, r, 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillStyle = rgba({ r: 255, g: 255, b: 255 }, p.alpha * 0.8);
+    ctx.fillStyle = rgba(AIRFLOW_RGB, p.alpha * 0.4);
     ctx.beginPath();
-    ctx.arc(x, y, p.radius * L.S * 0.4, 0, Math.PI * 2);
+    ctx.arc(x, y, r * 0.3, 0, Math.PI * 2);
     ctx.fill();
   }
   ctx.restore();
@@ -1391,15 +1443,15 @@ function drawRadiatingWaves(ctx, L, state, timeMs, rgb) {
   const f0 = state.frequencyHertz > 60 ? state.frequencyHertz : 0;
   if (!f0) return;
   const visualHz = Math.max(1.6, Math.min(14, f0 / 48));
-  const maxR = 220 * L.S;
+  const maxR = Math.max(L.W, L.H) * 0.85;
   ctx.save();
-  ctx.globalCompositeOperation = 'lighter';
-  for (let ring = 0; ring < 5; ring++) {
-    const phase = ((timeMs / 1000) * visualHz + ring / 5) % 1;
+  ctx.globalCompositeOperation = 'source-over';
+  for (let ring = 0; ring < 7; ring++) {
+    const phase = ((timeMs / 1000) * visualHz + ring / 7) % 1;
     const radius = 12 * L.S + phase * maxR;
-    const alpha = state.energy * (1 - phase) * 0.42;
+    const alpha = state.energy * soundFieldAttenuation(phase) * 0.55;
     ctx.strokeStyle = rgba(rgb, alpha);
-    ctx.lineWidth = (2.2 - phase * 1.4) * L.S;
+    ctx.lineWidth = Math.max(0.6, (2.4 - phase * 1.8) * L.S);
     ctx.beginPath();
     ctx.ellipse(L.lips.x, L.lips.y, radius * 1.15, radius * 0.62, -0.18, -0.55, 0.85);
     ctx.stroke();
@@ -1422,7 +1474,7 @@ function drawHeadSensationField(ctx, L, state, timeMs) {
   ctx.stroke();
   const vault = ctx.createRadialGradient(L.p(18, -78).x, L.p(18, -78).y, 8 * L.S, L.p(18, -78).x, L.p(18, -78).y, 110 * L.S);
   vault.addColorStop(0, rgbaVoice(SKULL_CHAMBER_RGB, 0.2 + amount * 0.38));
-  vault.addColorStop(1, 'rgba(72,196,255,0)');
+  vault.addColorStop(1, rgbaVoice(SKULL_CHAMBER_RGB, 0));
   ctx.fillStyle = vault;
   ctx.beginPath();
   ctx.ellipse(L.p(18, -78).x, L.p(18, -78).y, 96 * L.S, 78 * L.S, -0.1, 0, Math.PI * 2);

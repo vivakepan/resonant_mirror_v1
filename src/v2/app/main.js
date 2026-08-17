@@ -12,7 +12,7 @@ import {
   nextFigureZoom,
   pointHitsLarynx,
   pointHitsSkull,
-} from '../anatomy/anatomyRenderer.js?v=mouth-wide-1';
+} from '../anatomy/anatomyRenderer.js?v=restore-1';
 import { BreathKinematics, defaultBreathDemo, REST_POSE, VoiceSyncedBreath } from '../anatomy/breathKinematics.js';
 import {
   drawVocalFoldCloseup,
@@ -20,7 +20,7 @@ import {
   foldHudSummary,
   idleVocalFoldState,
   overlayTechniqueOnLive,
-} from '../anatomy/vocalFoldState.js?v=mouth-wide-1';
+} from '../anatomy/vocalFoldState.js?v=restore-1';
 import { renderInspectorHtml } from '../visualization/inspector.js';
 import { defaultFeatureFlags } from '../contracts/featureFlags.js';
 import { EVIDENCE_LABELS } from '../contracts/evidence.js';
@@ -33,7 +33,7 @@ import {
   nextSkullYaw,
   nextSkullZoom,
   skullCloseupState,
-} from '../anatomy/skullCloseup.js?v=mouth-wide-1';
+} from '../anatomy/skullCloseup.js?v=restore-1';
 import { mountPracticeInstruments } from './practiceUi.js';
 import { parseSongFilename } from '../lyrics/parseFilename.js';
 import { formatVowelSensationLine } from '../resonance/vowelMap.js';

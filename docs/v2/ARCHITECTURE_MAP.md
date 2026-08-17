@@ -12,7 +12,7 @@ repository. Observation, analysis, and visualization now live entirely under `sr
 | `src/v2/respiration/` | Inferred respiratory events; simulated anatomy drivers |
 | `src/v2/registration/` | Chest / mixed / head pattern candidates |
 | `src/v2/tension/` | Graded tension/strain evidence |
-| `src/v2/anatomy/` | Evidence-backed physiology renderer |
+| `src/v2/anatomy/` | Evidence-backed physiology renderer (figure zoom hangs the torso from the skull; voice/air falloff is in `soundField.js`) |
 | `src/v2/visualization/` | Provenance-tagged visual state |
 | `src/v2/memory/` | Personal prototypes without weight updates |
 | `ml/vocal_encoder/` | Offline encoder dataset and training loop |

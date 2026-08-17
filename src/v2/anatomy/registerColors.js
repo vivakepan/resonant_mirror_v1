@@ -6,10 +6,24 @@
 export const CHEST_VOICE_RGB = Object.freeze({ r: 255, g: 108, b: 36 });
 export const HEAD_VOICE_RGB = Object.freeze({ r: 56, g: 176, b: 255 });
 
-/** Filter chambers — separate from register, tuned for contrast on dark anatomy. */
+/**
+ * Layer palette so systems do not share a hue.
+ * Outline = body contour. Air = mint. Bone = ribs/sternum.
+ * Tract = magenta bridge between chest-orange and head-blue.
+ * Head space = ice cyan (filter chambers), not the head-register primary.
+ * Lungs = visible teal under bright ribs. Circulation stays red/blue.
+ */
+export const OUTLINE_RGB = Object.freeze({ r: 198, g: 214, b: 228 });
+export const BONE_RGB = Object.freeze({ r: 236, g: 242, b: 250 });
+export const AIRFLOW_RGB = Object.freeze({ r: 36, g: 255, b: 164 });
+export const TRACT_RGB = Object.freeze({ r: 216, g: 64, b: 255 });
+export const MUSCLE_RGB = Object.freeze({ r: 148, g: 86, b: 90 });
+export const LUNG_RGB = Object.freeze({ r: 62, g: 138, b: 158 });
+
+/** Filter chambers — not register orange/blue. */
 export const CHEST_CHAMBER_RGB = Object.freeze({ r: 255, g: 122, b: 48 });
-export const THROAT_CHAMBER_RGB = Object.freeze({ r: 255, g: 214, b: 64 });
-export const SKULL_CHAMBER_RGB = Object.freeze({ r: 72, g: 196, b: 255 });
+export const THROAT_CHAMBER_RGB = TRACT_RGB;
+export const SKULL_CHAMBER_RGB = Object.freeze({ r: 72, g: 214, b: 255 });
 
 function clamp(v, lo = 0, hi = 1) {
   return Math.max(lo, Math.min(hi, v));

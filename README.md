@@ -36,10 +36,12 @@ Practical differences from the original spec text:
 - **Vocal-fold close-up** is a teaching geometry: vibration and F0 can be derived from audio; opening, tension, and contact are simulated. It is not laryngoscopy.
 - **Lyrics file/paste/overlay is not in the UI.** Filename parsing remains for reference-song labels. Catalog lookup is unused.
 - Layer checkboxes (Pitch, Formants, Breath, Circulation, Chest/mixed/head, Tension, Aura, Support, Breath lanes, Transparent) zero their plan fields. Skull zoom honors those flags.
-- **Zoom:** `−` / `+` in the bottom-left of the main figure and the skull dialog. Scroll also zooms. The skull vault stays in frame when zoomed out. The skull close-up uses a wider camera so cavities and airways are not stacked on top of each other.
+- **Zoom:** `−` / `+` in the bottom-left of the main figure and the skull dialog. Scroll also zooms. The torso hangs from the skull, so zooming in enlarges the head without dropping it into the chest. The sagittal head is fitted to the cranial vault and seated on the cervical spine, including in side view. The skull vault stays in frame when zoomed out.
+- **Voice field:** simulated breath is intense at the lips and nose, then spreads and fades into the room on both exhale and inhale (approximately 1/r). Interior tract air stays visible.
 - **Mixed voice** can drive a pitch-linked vibration along the vocal architecture (folds → tract, with a faint chest coupling). That is inferred source–filter coupling, not a claim that the whole body is a resonator.
+- **Anatomy color language:** silver body outline; mint airflow; magenta vocal tract as the bridge between chest-orange and head-blue; ice-cyan head space (sinuses, nasal cavity, ear canals); visible teal lungs under bright ribs; red/blue circulation. Open /a/ widens mouth and throat.
 
-Hard-refresh so `index.html` loads `main.js?v=mouth-wide-1`.
+Hard-refresh so `index.html` loads `main.js?v=restore-1`.
 
 ### Plain-language terminology
 

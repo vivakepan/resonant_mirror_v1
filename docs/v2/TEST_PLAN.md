@@ -44,6 +44,10 @@ python3 tests/v2/test_ml_pipeline.py
 - LPC failure may fall back to smoothed spectral peaks as `inferred`.
 - Anatomy motion is tagged `simulated` without a body sensor.
 - Mouth aperture follows F1 or scream acoustics; it is not a single phonated preset. Open vowels and screams use a much larger visual jaw/lip range than rest or /i/.
+- Zooming the figure keeps the skull above the shoulders; the torso hangs from the jaw.
+- The sagittal head overlay is fitted to the vault and seated on the cervical spine.
+- Anatomy hues stay distinct: silver outline, mint airflow, magenta tract, ice-cyan head space, visible teal lungs. Oral airflow follows the anterior tract. Breath is intense at the aperture and diffuses into the room.
+- Simulated voice/air intensity falls with distance instead of cutting off at a hard radius. Open /a/ widens mouth and throat.
 - Skull-rim mapping is `inferred` or `simulated`, never cavity proof.
 
 ## Phase 4 — Respiration

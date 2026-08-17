@@ -91,10 +91,10 @@ export function tractConfigurationFromFormants(formantsHertz = [], {
     }),
   );
   const lipSpread = clamp(front * 0.9 + height * 0.22 - open * 0.4);
-  const jawDrop = clamp(0.08 + open * 0.92);
-  const mouthOpen = clamp(0.08 + open * 0.92);
+  const jawDrop = clamp(0.08 + open * 0.98);
+  const mouthOpen = clamp(0.08 + open * 0.98);
   const velumOpen = clamp(nasalCue);
-  const pharynxWide = clamp(0.2 + open * 0.58 + (1 - front) * 0.18);
+  const pharynxWide = clamp(0.18 + open * 0.72 + (1 - front) * 0.2);
   const palatalConstriction = clamp(height * front);
   const posture = nasalPostureFromAcoustics({
     formantsHertz,

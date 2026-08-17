@@ -1151,7 +1151,7 @@ Airflow particles MAY show inferred inhale/exhale direction.
 
 They MUST NOT be presented as measured airflow velocity.
 
-Simulated particles SHOULD travel the interior airway (lungs ↔ glottis ↔ mouth/nose) **and** continue into the exterior field in front of the face on exhale, reversing that path on inhale. A missing `airflowParticles` visual MUST NOT zero a live respiratory pose that already carries flow. The Breath layer MAY hide the entire stream.
+Simulated particles SHOULD travel the interior airway (lungs ↔ glottis ↔ mouth/nose) **and** continue into the exterior field in front of the face on exhale, reversing that path on inhale. Exterior voice/air intensity SHOULD fall with distance (approximately 1/r) so the field dissolves instead of remaining full-bright until a hard radius. A missing `airflowParticles` visual MUST NOT zero a live respiratory pose that already carries flow. The Breath layer MAY hide the entire stream.
 
 ---
 
@@ -2924,7 +2924,8 @@ This ledger records what the running browser app does relative to this specifica
 
 ## Added beyond numbered phase deliverables
 
-- Shared sagittal skull for zoom-in/out; `−`/`+` zoom controls bottom-left; drag-yaw on the main figure; ¾ view outline control. The skull vault stays in frame when zoomed out; the close-up camera is wider so cavities do not overlap.
+- Shared sagittal skull for zoom-in/out; `−`/`+` zoom controls bottom-left; drag-yaw on the main figure; ¾ view outline control. The torso hangs from the skull so zooming in does not drop the head into the chest. The sagittal overlay is fitted to the vault and seated on the cervical spine (it is not a larger silhouette beside the skull). The vault stays in frame when zoomed out; the close-up camera is wider so cavities do not overlap. Body contour is silver; airflow is mint and intense at the aperture then diffuses into the room; the vocal tract is magenta (bridge between chest-orange and head-blue); head space is ice cyan; lungs are visible teal under bright ribs; circulation stays red/blue.
+- Simulated voice/air visuals are intense at the lips/naris, then diffuse into the room (approximately 1/r) on both exhale and inhale.
 - Mixed-coordination vibration along the vocal architecture at pitch, labeled inferred and not whole-body resonance.
 - Voice-synced mouth/jaw from F1 plus scream/belt acoustics, with sustain hold and a wide visual aperture for open vowels and screams; idle 12 s breath demo when nothing is capturing. Close-up aperture no longer overrides a live pose with a small vowel mouth.
 - Fold technique models (literature-shaped, uncalibrated) overlaid on live F0/air.

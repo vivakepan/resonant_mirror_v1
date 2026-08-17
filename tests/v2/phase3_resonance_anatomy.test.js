@@ -22,6 +22,8 @@ import {
   pointHitsLarynx,
   pointHitsSkull,
   skullHitRegion,
+  soundFieldAttenuation,
+  breathPlumeScale,
   vagusAnatomyPaths,
   VAGUS_STRUCTURE_IDS,
 } from '../../src/v2/anatomy/anatomyRenderer.js';
@@ -39,14 +41,23 @@ import {
   nextSkullZoom as nextCloseupZoom,
   oralCavityWaypoints,
   rigidCloseupProject,
+  sagittalCameraForFigure,
+  SAGITTAL_LOCAL,
   skullCloseupState,
   tongueArticulation,
 } from '../../src/v2/anatomy/skullCloseup.js';
 import { nextSkullZoom, tubeTractDimensions } from '../../src/v2/anatomy/anatomy3dRenderer.js';
 import { snapshotPoseForClass } from '../../src/v2/anatomy/breathKinematics.js';
 import {
+  AIRFLOW_RGB,
+  BONE_RGB,
   CHEST_VOICE_RGB,
   HEAD_VOICE_RGB,
+  LUNG_RGB,
+  MUSCLE_RGB,
+  OUTLINE_RGB,
+  SKULL_CHAMBER_RGB,
+  TRACT_RGB,
   mixedSystemVibration,
   mixedVoiceRgb,
   registerVoiceAmounts,
@@ -161,7 +172,7 @@ describe('Phase 3 — anatomy contracts', () => {
     const L = anatomyLayout(800, 720);
     assert.equal(L.regionScale, 1.58);
     const bodyTop = L.skull.y - L.skull.ry;
-    assert.ok(bodyTop >= 24, 'skull vault stays inside the canvas');
+    assert.ok(bodyTop >= 24 - 1e-6, 'skull vault stays inside the canvas');
     assert.ok(L.abdomen.y1 - bodyTop > 720 * 0.82);
     assert.ok(L.skull.ry > 64 * Math.min(800 / 430, 720 / 700));
     assert.ok(L.ribs.rx > 96 * Math.min(800 / 430, 720 / 700));
@@ -360,6 +371,21 @@ describe('Phase 3 — anatomy contracts', () => {
     drawSkullCloseup(ctx, 720, 520, close, 80);
   });
 
+  it('keeps anatomy layer hues distinct so systems do not share a color', () => {
+    assert.ok(AIRFLOW_RGB.g > AIRFLOW_RGB.r && AIRFLOW_RGB.g > AIRFLOW_RGB.b, 'airflow is mint');
+    assert.ok(TRACT_RGB.b > TRACT_RGB.g && TRACT_RGB.r > 180, 'tract is magenta, the bridge between registers');
+    assert.ok(TRACT_RGB.g < CHEST_VOICE_RGB.g, 'tract is not chest-orange');
+    assert.ok(TRACT_RGB.r > HEAD_VOICE_RGB.r, 'tract is not head-blue');
+    assert.ok(SKULL_CHAMBER_RGB.b > SKULL_CHAMBER_RGB.r + 80, 'head space is ice cyan');
+    assert.ok(SKULL_CHAMBER_RGB.g > HEAD_VOICE_RGB.g, 'head space is cyanner than head register');
+    assert.ok(LUNG_RGB.b > LUNG_RGB.r, 'lungs stay cool teal');
+    assert.ok(BONE_RGB.r + BONE_RGB.g + BONE_RGB.b > LUNG_RGB.r + LUNG_RGB.g + LUNG_RGB.b + 150, 'ribs stay brighter than lung fill');
+    assert.ok(OUTLINE_RGB.b > OUTLINE_RGB.r, 'body contour is cool silver');
+    assert.ok(MUSCLE_RGB.r > MUSCLE_RGB.b, 'muscle stays in the dusty-rose family');
+    assert.notDeepEqual(AIRFLOW_RGB, HEAD_VOICE_RGB);
+    assert.notDeepEqual(AIRFLOW_RGB, CHEST_VOICE_RGB);
+  });
+
   it('moves diaphragm, ribs, and lungs with simulated respiratory pose, not pitch', () => {
     const rest = anatomyLayout(400, 720, { pose: snapshotPoseForClass('unknown') });
     const inhale = anatomyLayout(400, 720, { pose: snapshotPoseForClass('inhale') });
@@ -440,8 +466,54 @@ describe('Phase 3 — anatomy contracts', () => {
     assert.equal(nextFigureZoom(0.48, 800), 0.48);
     const tight = anatomyLayout(800, 720);
     const far = anatomyLayout(800, 720, {}, { figureZoom: 0.55 });
+    const close = anatomyLayout(800, 720, {}, { figureZoom: 1.45 });
     assert.ok(far.scale < tight.scale);
     assert.ok(far.skull.y - far.skull.ry >= 24);
+    assert.ok(close.neck.y1 > close.neck.y0, 'neck keeps length when zoomed in');
+    assert.ok(close.shoulders.y > close.skull.y + close.skull.ry * 0.25, 'shoulders stay below the skull');
+    assert.ok(close.larynx.y > close.skull.y);
+    assert.ok(close.larynx.y < close.shoulders.y);
+    assert.ok(close.skull.y - close.skull.ry >= 24);
+    for (const zoom of [0.48, 0.88, 1, 1.35, 1.55]) {
+      const L = anatomyLayout(800, 720, {}, { figureZoom: zoom });
+      assert.ok(L.neck.y1 > L.neck.y0, `neck length at zoom ${zoom}`);
+      assert.ok(L.shoulders.y > L.jaw.y, `jaw stays above the shoulders at zoom ${zoom}`);
+      const cam = sagittalCameraForFigure(L);
+      assert.ok(Math.abs((cam.cy + SAGITTAL_LOCAL.vaultY * cam.S) - (L.skull.y - L.skull.ry)) < 1.5);
+      assert.ok(Math.abs((cam.cx + SAGITTAL_LOCAL.spineX * cam.S) - L.cx) < 1.5);
+      assert.ok(Math.abs((cam.cy + SAGITTAL_LOCAL.baseY * cam.S) - L.neck.y0) < 1.5);
+      const headW = (SAGITTAL_LOCAL.faceX - SAGITTAL_LOCAL.occiputX) * cam.S;
+      assert.ok(headW < L.skull.rx * 3.2, 'side-view silhouette stays near skull size, not a giant overlay');
+    }
+    assert.ok(soundFieldAttenuation(0) > 0.95);
+    assert.ok(soundFieldAttenuation(0.85) < soundFieldAttenuation(0.2) * 0.45);
+    assert.ok(soundFieldAttenuation(1) < 0.06);
+    assert.ok(breathPlumeScale(0.9) > breathPlumeScale(0.12) * 2.4, 'the jet widens as it leaves the face');
+    const farJets = exteriorBreathJetParticles(tight, {
+      timeMs: 240,
+      direction: 1,
+      flowRate: 0.8,
+      mouthOpen: 0.7,
+      phonated: true,
+    });
+    const near = farJets.filter((p) => p.t < 0.15);
+    const distant = farJets.filter((p) => p.t > 0.8);
+    assert.ok(near.length && distant.length);
+    const nearA = near.reduce((s, p) => s + p.alpha, 0) / near.length;
+    const farA = distant.reduce((s, p) => s + p.alpha, 0) / distant.length;
+    assert.ok(nearA > 0.25, 'exhale is intense at the lips');
+    assert.ok(farA < nearA * 0.35, 'breath diffuses into the room instead of staying full-bright');
+    const inhaleJets = exteriorBreathJetParticles(tight, {
+      timeMs: 240,
+      direction: -1,
+      flowRate: 0.8,
+      mouthOpen: 0.4,
+    });
+    const inNear = inhaleJets.filter((p) => p.t < 0.15);
+    const inFar = inhaleJets.filter((p) => p.t > 0.8);
+    const inNearA = inNear.reduce((s, p) => s + p.alpha, 0) / inNear.length;
+    const inFarA = inFar.reduce((s, p) => s + p.alpha, 0) / inFar.length;
+    assert.ok(inNearA > inFarA * 2, 'inhale concentrates as it enters and is diffuse in the room');
     assert.ok(nextSkullYaw(0, 40) > 0);
     assert.equal(nextSkullYaw(1.15, 400), 1.15);
     assert.equal(nextSkullYaw(-1.15, -400), -1.15);
@@ -651,6 +723,7 @@ describe('Phase 3 — anatomy contracts', () => {
     assert.ok(hee.lipSpread > haah.lipSpread);
     assert.ok(haah.mouthOpen > hee.mouthOpen);
     assert.ok(haah.jawDrop > hee.jawDrop);
+    assert.ok(haah.pharynxWide > hee.pharynxWide, '/a/ opens the throat as well as the mouth');
     assert.ok(him.velumOpen > hee.velumOpen);
     assert.ok(him.jawRetract > hee.jawRetract);
     assert.ok(him.headTuck > hee.headTuck);
@@ -1202,6 +1275,10 @@ describe('Phase 3 — anatomy contracts', () => {
     assert.ok(inhaleJets.some((p) => p.inbound && p.t > 0.55), 'inhale particles start in the room and enter the face');
     const oral = airflowWaypoints(L, 'oral');
     assert.ok(oral[0].x - L.mouth.x > L.S(80), 'oral path begins in the environment, not inside the lips');
+    assert.ok(
+      oral.some((p) => p.x > L.cx + L.S(36) && p.y < L.larynx.y),
+      'oral airflow follows the anterior tract instead of the cervical spine',
+    );
   });
 });
 

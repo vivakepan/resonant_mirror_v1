@@ -16,6 +16,7 @@ export const PROVISIONAL_MAX_AGE_SECONDS = Object.freeze({
   skullRimUpperProduction: 0.4,
   chestRegionGlow: 0.4,
   mixedCoordinationField: 0.4,
+  registrationTransition: 0.4,
   diaphragmMotion: 0.6,
   ribMotion: 0.6,
   airflowParticles: 0.6,
@@ -73,6 +74,13 @@ export const VISUAL_CONTRACTS = Object.freeze({
     sourceFieldPaths: ['inferences.registration'],
     unknownBehavior: 'fade_to_neutral',
     notes: 'Mixed voice is a coordination pattern, not a third cavity.',
+  },
+  registrationTransition: {
+    visualName: 'registrationTransition',
+    evidenceClass: 'inferred',
+    sourceFieldPaths: ['inferences.registration'],
+    unknownBehavior: 'fade_to_neutral',
+    notes: 'Probabilistic transition-shape candidate. The label “forced” is not used without annotation.',
   },
   diaphragmMotion: {
     visualName: 'diaphragmMotion',

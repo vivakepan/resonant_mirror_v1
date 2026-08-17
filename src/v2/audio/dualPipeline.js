@@ -123,6 +123,7 @@ export class DualAudioPipeline {
     this.referenceTime = null;
     this.pipeline = new DualPipeline();
     this.referenceFileName = null;
+    this.ownsAudioElement = false;
   }
 
   async _ensureContext() {
@@ -176,12 +177,29 @@ export class DualAudioPipeline {
 
   async loadReference(file) {
     await this._ensureContext();
-    this.stopReference();
+    this._disconnectReferenceGraph({ pauseOwned: true });
+    this.ownsAudioElement = true;
     this.audioEl = new Audio();
     this.audioEl.crossOrigin = 'anonymous';
     this.audioEl.src = URL.createObjectURL(file);
     this.referenceFileName = file.name;
     this.referenceSource = this.ctx.createMediaElementSource(this.audioEl);
+    this.referenceSource.connect(this.referenceAnalyser);
+    this.referenceSource.connect(this.ctx.destination);
+    return this.audioEl;
+  }
+
+  async attachReferenceMedia(element, fileName = 'media') {
+    if (!element) return null;
+    await this._ensureContext();
+    this._disconnectReferenceGraph({ pauseOwned: true });
+    this.ownsAudioElement = false;
+    this.audioEl = element;
+    this.referenceFileName = fileName;
+    if (!element._rmv2MediaSource) {
+      element._rmv2MediaSource = this.ctx.createMediaElementSource(element);
+    }
+    this.referenceSource = element._rmv2MediaSource;
     this.referenceSource.connect(this.referenceAnalyser);
     this.referenceSource.connect(this.ctx.destination);
     return this.audioEl;
@@ -195,14 +213,21 @@ export class DualAudioPipeline {
   }
 
   pauseReference() {
-    if (this.audioEl) this.audioEl.pause();
+    if (this.audioEl && this.ownsAudioElement) this.audioEl.pause();
     this.pipeline.referencePlaying = false;
   }
 
   stopReference() {
     this.pauseReference();
-    if (this.audioEl) {
+    if (this.audioEl && this.ownsAudioElement) {
       this.audioEl.currentTime = 0;
+    }
+    this._disconnectReferenceGraph({ pauseOwned: false });
+  }
+
+  _disconnectReferenceGraph({ pauseOwned = false } = {}) {
+    if (pauseOwned && this.ownsAudioElement && this.audioEl) {
+      this.audioEl.pause();
     }
     if (this.referenceSource) {
       try { this.referenceSource.disconnect(); } catch { /* ignore */ }

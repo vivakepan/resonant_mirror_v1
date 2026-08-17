@@ -3,7 +3,7 @@
  * Never diagnosis, never binary tense/not-tense, never measured muscle force.
  */
 
-export const TENSION_REGIONS = Object.freeze(['jaw', 'face', 'throat', 'upper_torso', 'global']);
+export const TENSION_REGIONS = Object.freeze(['jaw', 'face', 'throat', 'neck', 'upper_torso', 'global']);
 export const TENSION_MODEL_VERSION = 'tension-heuristic-0';
 export const TENSION_CAPABILITY_STATUS = 'research_target';
 
@@ -35,17 +35,20 @@ export function estimateTension(features, { selfLabels = [] } = {}) {
   if (pitchConf > 0 && pitchConf < 0.35 && db > -30) global += 0.15;
 
   const labels = new Set(selfLabels);
-  if (labels.has('pressed') || labels.has('strained')) global += 0.25;
-  if (labels.has('jaw tight')) global += 0.15;
-  if (labels.has('throat tight')) global += 0.15;
-  if (labels.has('free') || labels.has('comfortable')) global *= 0.5;
+    if (labels.has('pressed') || labels.has('strained')) global += 0.25;
+    if (labels.has('jaw tight')) global += 0.15;
+    if (labels.has('throat tight') || labels.has('neck engaged')) global += 0.15;
+    if (labels.has('free') || labels.has('comfortable')) global *= 0.5;
 
-  global = Math.max(0, Math.min(1, global));
-  const regions = {
-    jaw: labels.has('jaw tight') ? Math.min(1, global + 0.2) : global * 0.6,
-    face: global * 0.4,
-    throat: labels.has('throat tight') ? Math.min(1, global + 0.2) : global * 0.7,
-    upper_torso: labels.has('shoulders lifted') ? Math.min(1, global + 0.15) : global * 0.3,
+    global = Math.max(0, Math.min(1, global));
+    const regions = {
+      jaw: labels.has('jaw tight') ? Math.min(1, global + 0.2) : global * 0.6,
+      face: global * 0.4,
+      throat: (labels.has('throat tight') || labels.has('neck engaged'))
+        ? Math.min(1, global + 0.2)
+        : global * 0.7,
+      neck: labels.has('neck engaged') ? Math.min(1, global + 0.25) : global * 0.65,
+      upper_torso: labels.has('shoulders lifted') ? Math.min(1, global + 0.15) : global * 0.3,
     global,
   };
 

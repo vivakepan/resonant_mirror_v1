@@ -5,7 +5,7 @@
  * MUST return unknown rather than false precision.
  */
 
-import { binToHertz } from '../acoustic/fft.js';
+import { binToHertz, magnitudeSpectrum } from '../acoustic/fft.js';
 
 export const FORMANT_ALGORITHM_VERSION = 'lpc-envelope-1';
 
@@ -76,6 +76,51 @@ function peakIndices(mag, sampleRate, fftSize, { minHz = 200, maxHz = 4000, coun
   return chosen;
 }
 
+function smoothedEnvelopePeaks(samples, sampleRate) {
+  const { mag, fftSize } = magnitudeSpectrum(samples);
+  const width = Math.max(3, Math.round((220 * fftSize) / sampleRate));
+  const env = new Float64Array(mag.length);
+  for (let i = 0; i < mag.length; i++) {
+    let s = 0;
+    let n = 0;
+    for (let j = i - width; j <= i + width; j++) {
+      if (j >= 0 && j < mag.length) {
+        s += mag[j];
+        n += 1;
+      }
+    }
+    env[i] = n ? s / n : 0;
+  }
+  return { peaks: peakIndices(env, sampleRate, fftSize, { count: 3 }), env };
+}
+
+function packFormants(peaks, {
+  confidenceScale = 1,
+  qualityFlags = [],
+  env = null,
+  fallback = false,
+} = {}) {
+  const formantsHertz = peaks.map((p) => p.hz);
+  const maxPeak = Math.max(...peaks.map((p) => p.mag), 0);
+  const formantConfidence = peaks.map((p) => {
+    const rel = maxPeak > 0 ? p.mag / maxPeak : 0;
+    return Math.max(0, Math.min(1, rel * confidenceScale));
+  });
+  while (formantsHertz.length < 3) {
+    formantsHertz.push(null);
+    formantConfidence.push(0);
+  }
+  return {
+    formantsHertz,
+    formantConfidence,
+    spectralEnvelope: env,
+    algorithmVersion: FORMANT_ALGORITHM_VERSION,
+    qualityFlags,
+    unknown: false,
+    fallback,
+  };
+}
+
 export function estimateFormants(samples, sampleRate, { f0 = null, order = 14 } = {}) {
   const n = samples.length;
   if (n < order * 4) {
@@ -102,33 +147,31 @@ export function estimateFormants(samples, sampleRate, { f0 = null, order = 14 } 
     confidenceScale *= 0.35;
     qualityFlags.push('unreliable_formant_estimate');
   }
-  if (peaks.length < 2) {
-    return unknownFormants('too_few_peaks', qualityFlags);
-  }
 
-  const formantsHertz = peaks.map((p) => p.hz);
-  const maxPeak = Math.max(...peaks.map((p) => p.mag));
+  const maxPeak = peaks.length ? Math.max(...peaks.map((p) => p.mag)) : 0;
   const formantConfidence = peaks.map((p) => {
     const rel = maxPeak > 0 ? p.mag / maxPeak : 0;
     return Math.max(0, Math.min(1, rel * confidenceScale));
   });
-
-  const tooLow = formantConfidence.every((c) => c < 0.25);
-  if (tooLow) return unknownFormants('low_confidence', qualityFlags);
-
-  while (formantsHertz.length < 3) {
-    formantsHertz.push(null);
-    formantConfidence.push(0);
+  const tooLow = !formantConfidence.length || formantConfidence.every((c) => c < 0.25);
+  if (peaks.length >= 2 && !tooLow) {
+    return packFormants(peaks, {
+      confidenceScale,
+      qualityFlags,
+      env,
+    });
   }
 
-  return {
-    formantsHertz,
-    formantConfidence,
-    spectralEnvelope: env,
-    algorithmVersion: FORMANT_ALGORITHM_VERSION,
-    qualityFlags,
-    unknown: false,
-  };
+  const spectral = smoothedEnvelopePeaks(samples, sampleRate);
+  if (spectral.peaks.length >= 2) {
+    return packFormants(spectral.peaks, {
+      confidenceScale: Math.min(0.45, confidenceScale),
+      qualityFlags: [...qualityFlags, 'unreliable_formant_estimate'],
+      env: spectral.env,
+      fallback: true,
+    });
+  }
+  return unknownFormants(peaks.length < 2 ? 'too_few_peaks' : 'low_confidence', qualityFlags);
 }
 
 function unknownFormants(reason, qualityFlags = []) {

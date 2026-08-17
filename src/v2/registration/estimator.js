@@ -12,8 +12,48 @@ export const REGISTRATION_CLASSES = Object.freeze([
   'unknown',
 ]);
 
-export const REGISTRATION_MODEL_VERSION = 'registration-heuristic-0';
+export const REGISTRATION_MODEL_VERSION = 'registration-heuristic-1';
 export const REGISTRATION_CAPABILITY_STATUS = 'research_target';
+
+function clamp01(v) {
+  return Math.max(0, Math.min(1, Number(v) || 0));
+}
+
+function glowKey(className) {
+  if (className === 'chest_dominant') return 'chest';
+  if (className === 'head_dominant') return 'head';
+  if (className === 'mixed') return 'mixed';
+  return null;
+}
+
+/**
+ * Anatomy glow for one winning register. Leftover probability on the
+ * other classes must not light chest, mixed, and head at the same time.
+ * Transition may light the from/to pair only.
+ */
+export function registerGlowFromInference(reg = {}) {
+  const out = { chest: 0, mixed: 0, head: 0 };
+  const cls = reg.class;
+  if (!cls || cls === 'unknown') return out;
+  const p = reg.probabilities || {};
+  const amountFor = (name) => {
+    const raw = Number(p[name]);
+    const conf = clamp01(reg.confidence);
+    if (Number.isFinite(raw) && raw > 0) return clamp01(Math.max(raw, cls === name ? conf : 0));
+    return cls === name ? conf : 0;
+  };
+  if (cls === 'transition' && reg.transition) {
+    for (const name of [reg.transition.from, reg.transition.to]) {
+      const key = glowKey(name);
+      if (key) out[key] = Math.max(out[key], Math.max(0.36, amountFor(name)));
+    }
+    return out;
+  }
+  const key = glowKey(cls);
+  if (!key) return out;
+  out[key] = Math.max(0.22, amountFor(cls));
+  return out;
+}
 
 export function classifyRegistration(features, prev = null) {
   const f0 = features.fundamentalFrequencyHertz;
@@ -30,25 +70,28 @@ export function classifyRegistration(features, prev = null) {
   }
 
   // PROVISIONAL, singer-relative starting heuristics — not body measurements.
-  let chest = 0.2;
-  let head = 0.2;
-  let mixed = 0.2;
-  if (f0 < 220) chest += 0.35;
-  else if (f0 > 400) head += 0.35;
-  else mixed += 0.25;
+  // Keep loser mass low so a single-register phrase does not look like all three.
+  let chest = 0.03;
+  let head = 0.03;
+  let mixed = 0.03;
+  if (f0 < 200) chest += 0.62;
+  else if (f0 > 390) head += 0.62;
+  else if (f0 < 250) { chest += 0.28; mixed += 0.34; }
+  else if (f0 > 330) { head += 0.28; mixed += 0.34; }
+  else mixed += 0.55;
 
-  if (centroid != null && centroid < 1200) chest += 0.1;
-  if (centroid != null && centroid > 2200) head += 0.1;
+  if (centroid != null && centroid < 1200) { chest += 0.12; head *= 0.45; }
+  if (centroid != null && centroid > 2200) { head += 0.12; chest *= 0.45; }
   if (tilt != null && tilt < -1.2) chest += 0.05;
   if (tilt != null && tilt > -0.4) head += 0.05;
 
-  const sum = chest + head + mixed + 0.1;
+  const sum = chest + head + mixed + 0.08;
   const probabilities = {
     chest_dominant: chest / sum,
     head_dominant: head / sum,
     mixed: mixed / sum,
-    transition: 0.1 / sum,
-    unknown: 0.05,
+    transition: 0.08 / sum,
+    unknown: 0.04,
   };
 
   let cls = 'mixed';

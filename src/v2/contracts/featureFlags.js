@@ -42,8 +42,22 @@ export function defaultFeatureFlags() {
     respiration: gate('experimental', {
       capabilityStatus: 'research_target',
       assertiveVisuals: false,
-      notes: 'Held-out inhale/exhale validation is required before assertive breath visuals.',
+      simulatedAnatomy: true,
+      experimentalLanes: true,
+      notes: 'Simulated airflow/diaphragm may follow an inferred respiratory state. Assertive validated breath claims stay off until held-out evaluation.',
     }),
+    legacyPhysicsLayer: {
+      enabled: false,
+      status: 'disabled',
+      evidenceClass: 'legacy_hypothesis',
+      isolated: true,
+    },
+    legacyInterferenceField: {
+      enabled: false,
+      status: 'disabled',
+      evidenceClass: 'simulated',
+      isolated: true,
+    },
     registration: gate('experimental', {
       capabilityStatus: 'research_target',
       notes: 'Chest / mixed / head are probabilistic candidates and may be unknown.',
@@ -87,18 +101,6 @@ export function defaultFeatureFlags() {
       capabilityStatus: 'research_target',
       notes: 'Legacy WHOLE-SYSTEM RESONANCE badge is isolated and must not drive this flag.',
     }),
-    legacyPhysicsLayer: {
-      enabled: true,
-      status: 'experimental',
-      evidenceClass: 'legacy_hypothesis',
-      isolated: true,
-    },
-    legacyInterferenceField: {
-      enabled: true,
-      status: 'experimental',
-      evidenceClass: 'simulated',
-      isolated: true,
-    },
     visualProvenanceInspector: { enabled: true, developmentBuilds: true },
   };
 }

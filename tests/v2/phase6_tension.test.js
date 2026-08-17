@@ -33,6 +33,14 @@ describe('Phase 6 — tension evidence', () => {
     assert.ok(state.regions.jaw >= state.regions.face);
     assert.match(state.accessibilityCue, /tension evidence/);
     assert.ok(SELF_TENSION_LABELS.includes('jaw tight'));
+    const neck = est.infer(frame({
+      periodicity: 0.2,
+      relativeLevelDecibelsFullScale: -10,
+      spectralTilt: 0.1,
+      pitchConfidence: 0.2,
+    }), { selfLabels: ['neck engaged'] });
+    assert.ok(neck.regions.neck >= neck.regions.face);
+    assert.ok(neck.regions.throat >= neck.regions.face);
     const color = orangeRedColor(0.9);
     assert.match(color.css, /rgba\(255,/);
     assert.equal(densityCue(0.9), 'tension evidence: dense');

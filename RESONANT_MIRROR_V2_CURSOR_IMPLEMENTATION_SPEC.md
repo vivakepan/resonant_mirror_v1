@@ -1143,11 +1143,15 @@ Diaphragm, rib, and torso motion MAY animate with inferred respiratory state.
 
 Unless a sensor measures those structures, the motion MUST be labeled `simulated`.
 
+Mouth and jaw aperture SHOULD follow the vocalist's acoustics rather than a single phonated-exhale preset: F1 when formants are reliable, and loud/bright/low-periodicity energy when they are not (held screams, belts). Close-front vowels MUST remain relatively closed even when loud. Percussion and pitched instruments MUST NOT open the mouth. Peak-hold MAY keep a wide aperture through brief level dips during sustained phonation. A future offline technique-geometry model MAY replace this mapping after held-out evaluation; live sessions MUST NOT update weights.
+
 ## REQ-043 — Airflow
 
 Airflow particles MAY show inferred inhale/exhale direction.
 
 They MUST NOT be presented as measured airflow velocity.
+
+Simulated particles SHOULD travel the interior airway (lungs ↔ glottis ↔ mouth/nose) **and** continue into the exterior field in front of the face on exhale, reversing that path on inhale. Exterior voice/air intensity SHOULD fall with distance (approximately 1/r) so the field dissolves instead of remaining full-bright until a hard radius. A missing `airflowParticles` visual MUST NOT zero a live respiratory pose that already carries flow. The Breath layer MAY hide the entire stream.
 
 ---
 
@@ -2140,6 +2144,10 @@ Exit criteria:
 - airflow animation follows the accepted respiratory state deterministically;
 - held-out validation reports missed and false inhale/exhale events and typical event-boundary timing error before assertive breath visuals are enabled.
 
+The browser repository currently ships `respiration-heuristic-1`: a more sensitive provisional rule set that prefers vocal formant structure over pitched-instrument frames and can promote quiet rising broadband noise to an inhale candidate. That heuristic is **not** the Phase 4 held-out validation gate. A production breath-phase model MUST be trained **offline** (pre-training / Phase 7 corpus), evaluated on held-out singers and negative instrument examples, and loaded as a frozen checkpoint. Live sessions MUST NOT update weights (see Section 0 item 7 and Phase 12).
+
+When microphone capture is active, anatomy and breath following MUST prefer the vocalist stream over a playing reference file.
+
 ## Phase 5 — Registration and transition observation
 
 Implement an initial research-only inference path for:
@@ -2525,6 +2533,8 @@ Implementation correction: use graded **tension evidence**. Optional video may i
 Microphone audio can contain breath evidence, but it does not directly measure diaphragm or airflow direction.  
 Implementation correction: respiratory state is inferred; anatomy and airflow are simulated.
 
+A sensitive live heuristic is allowed for *simulated* following. A trusted inhale/exhale event detector is a **pre-trained, held-out-validated checkpoint**, not something the app learns while the singer is in the session.
+
 ### Correction F — Legacy whole-system badge is not ground truth
 
 The existing threshold is an exploratory arithmetic visualization.  
@@ -2885,3 +2895,44 @@ It should not pretend to answer, without evidence:
 > What exact internal anatomical motion occurred?
 
 The implementation is successful when the system becomes increasingly informative **without becoming increasingly presumptuous**.
+
+---
+
+# 40. Current repository implementation ledger (17 Aug 2026)
+
+This ledger records what the running browser app does relative to this specification. It is not a substitute for held-out validation gates.
+
+## Implemented according to the plan (Phases 0–6)
+
+- Evidence classes, provenance, visual contracts, feature flags.
+- Dual pipeline: microphone and uploaded reference file, separate lanes, leakage warning. DRM catalog streams still cannot supply PCM.
+- Deterministic acoustics: F0, RMS, dBFS, spectral features, periodicity, harmonicity, formants with unknown when unreliable.
+- Anatomy v2: realistic figure, transparency, simulated diaphragm/ribs, inferred chest/mixed/head mappings, formant-gated tract chambers.
+- Respiratory events as inferred classes with smoothing, simulated airflow, event records. Assertive visuals remain off until held-out validation.
+- Registration probabilities and tension-evidence glow with inspector/stale behavior.
+
+## Altered from the original spec text
+
+- **Airflow (REQ-043):** interior path plus exterior inhale/exhale jets. A live pose with flow is not zeroed just because the `airflowParticles` visual is missing.
+- **Breath source:** when the microphone is on, the figure follows the vocalist, not the playing reference mix.
+- **Respiration classifier:** `respiration-heuristic-1` is more sensitive to quiet rising breath noise and rejects pitched-instrument frames that lack a vocal formant pair. Still provisional; Phase 4 held-out gate is open.
+- **Mouth / technique geometry:** aperture follows F1 when reliable, and loud bright aperiodic energy when formants drop out. A held scream stays open; loud /i/ stays relatively closed. Open vowels and screams use a much larger visual jaw/lip range than rest. This is still a simulated teaching pose. Offline pre-training of technique geometry is the path to a trusted mapping; live sessions do not update weights.
+- **Formant tracking:** if LPC peaks fail, a smoothed spectral-envelope fallback may continue F1/F2 as `inferred`. High F0 still returns unknown. Tract chambers may follow spectral energy when peaks are missing.
+- **Lyrics overlay / paste input:** removed from the observation UI. Filename parsing remains for reference labels only.
+- **Vocal-fold and skull close-ups:** added teaching views. Fold opening/tension/contact are simulated; vibration/F0 may be derived. Head-voice vault glow is inferred sensation, not a cranial resonator.
+- **Layer checkboxes:** each `show*` flag zeros its plan fields, including skull zoom.
+
+## Added beyond numbered phase deliverables
+
+- Shared sagittal skull for zoom-in/out; `−`/`+` zoom controls bottom-left; drag-yaw on the main figure; ¾ view outline control. The torso hangs from the skull so zooming in does not drop the head into the chest. The sagittal overlay is fitted to the vault and seated on the cervical spine (it is not a larger silhouette beside the skull). The vault stays in frame when zoomed out; the close-up camera is wider so cavities do not overlap. Body contour is silver; airflow is mint and intense at the aperture then diffuses into the room; tract walls are magenta (bridge between chest-orange and head-blue register). Filter chambers are a separate triad when lit: amber-gold chest, lemon throat, electric-cyan head. Lungs are visible teal under bright ribs; circulation stays red/blue. Register anatomy lights the winning class only (transition may light from/to); head-voice glow sits on the brainstem; throat resonance sits at the top of the cervical spine. Head/mixed vibrate the skull rim; chest/mixed vibrate ribs, spine, and laryngeal cartilage. Skull-rim and ribcage vibration is a razor-thin mint breath line. The airway column is outlined hot-rose from the xiphoid to the cranial spine; the larynx/voice box is indigo. Breath + vagus focus also keeps spine, head/brain, and heart visible. A humming candidate (closed-lip voiced nasal) is inferred and couples vibration into the skull/nasal path — not whole-body resonance.
+- Simulated voice/air visuals are intense at the lips/naris, then diffuse into the room (approximately 1/r) on both exhale and inhale.
+- Mixed-coordination vibration along the vocal architecture at pitch, labeled inferred and not whole-body resonance.
+- Voice-synced mouth/jaw from F1 plus scream/belt acoustics, with sustain hold and a wide visual aperture for open vowels and screams; idle 12 s breath demo when nothing is capturing. Close-up aperture no longer overrides a live pose with a small vowel mouth.
+- Fold technique models (literature-shaped, uncalibrated) overlaid on live F0/air.
+- Practice piano and metronome in the observation UI.
+- Support-evidence overlay remains optional and is not a `SUPPORTED` classifier.
+
+## Not implemented (Phases 7–12)
+
+Dataset encoder, expressive-intensity ranker, personal prototypes, phrase temporal model, and optional personal training. Those MUST stay offline. Live sessions MUST NOT update model weights. A future breath-phase network is pre-training plus held-out evaluation, then a frozen checkpoint — not an in-session learner.
+

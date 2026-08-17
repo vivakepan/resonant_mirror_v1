@@ -16,7 +16,11 @@ That specification contains the complete numbered requirements, data contracts, 
 
 ## Project status
 
-Resonant Mirror v2 currently has an **audited pre-implementation requirements specification** and is staged for incremental implementation on top of the existing Resonant Singer browser prototype.
+Resonant Mirror v2 is implemented incrementally on top of the imported Resonant Singer browser prototype. Phases 0–12 of the specification now have code, tests, and research gates.
+
+Open the observation UI at `pages/resonant_mirror_v2.html` (or `http://localhost:8000/pages/resonant_mirror_v2.html` after `npm run serve`). The legacy visual tuner remains at `index.html`.
+
+Learned outputs (respiration, registration, tension, intensity, support, personal training) stay behind research gates until their evaluation criteria pass. Neural-network weights never update during a live session.
 
 The existing codebase already provides useful foundations including browser microphone analysis, uploaded-audio analysis, deterministic visualizations, breath modeling, session export, offline analysis, and verification scripts. Those foundations should be evolved rather than casually discarded.
 
@@ -825,7 +829,10 @@ npm run serve
 python3 -m http.server 8080
 
 # Existing main tuner
-# http://localhost:8080/index.html
+# http://localhost:8000/index.html
+
+# Resonant Mirror v2 observation UI
+# http://localhost:8000/pages/resonant_mirror_v2.html
 
 # Existing Release Principle sandbox
 # http://localhost:8080/pages/release_principle.html

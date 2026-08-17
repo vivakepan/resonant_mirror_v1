@@ -1,6 +1,6 @@
 {
   "name": "resonant-mirror",
-  "version": "2.0.0-phase0",
+  "version": "2.0.0-phase12",
   "description": "Resonant Mirror v2 — local-first vocal observation with evidence-labeled analysis, built on the Resonant Singer prototype.",
   "type": "module",
   "scripts": {

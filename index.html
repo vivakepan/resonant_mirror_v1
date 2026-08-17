@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Resonant Singer — A Visual Tuner</title>
+  <link rel="stylesheet" href="styles/main.css">
+</head>
+<body>
+<div class="grain"></div>
+<div class="frame">
+
+  <header>
+    <h1>The Resonant Singer · <em>a study in coupled oscillators</em></h1>
+    <div class="meta">SYSTEM · <b id="sysState">SCANNING</b></div>
+  </header>
+
+  <nav class="left-rail">
+    <h3>off-resonance</h3>
+
+    <button class="anti-btn" data-f="78">
+      <span class="label-main">SUB · 78</span>
+      <span class="label-sub">below all fundamentals*</span>
+    </button>
+
+    <button class="anti-btn ar" data-f="147">
+      <span class="label-main">◊ NULL · 147</span>
+      <span class="label-sub">chest ⇌ trachea — √(120 × 180)</span>
+    </button>
+
+    <button class="anti-btn ar" data-f="355">
+      <span class="label-main">◊ DEAD · 355</span>
+      <span class="label-sub">pharynx ⇌ mouth — √(300 × 420)</span>
+    </button>
+
+    <button class="anti-btn ar" data-f="467">
+      <span class="label-main">◊ COLD · 467</span>
+      <span class="label-sub">mouth ⇌ skull — √(420 × 520)</span>
+    </button>
+
+    <button class="anti-btn ar" data-f="628">
+      <span class="label-main">◊ MUTE · 628</span>
+      <span class="label-sub">nasal ⇌ eyes — √(580 × 680)</span>
+    </button>
+
+    <button class="anti-btn" data-f="845">
+      <span class="label-main">SUPRA · 845</span>
+      <span class="label-sub">above all fundamentals</span>
+    </button>
+
+    <div class="rail-note">
+      <b>SUB / SUPRA:</b> below / above all zone fundamentals. *Note: SUB still excites mid zones faintly through its upper harmonics — truly dead frequencies are rare in a 10-zone harmonic system.<br><br>
+      <span style="color:#b48cff">◊ marked:</span> <strong>spectral nulls</strong> at geometric means between adjacent zone pairs. With a song loaded, <strong>spatial nodes</strong> from the interference field are a separate phenomenon.
+    </div>
+  </nav>
+
+  <main>
+    <canvas id="c"></canvas>
+    <div class="resonance-badge" id="badge">OFF-RESONANCE</div>
+    <div class="system-notice" id="notice"></div>
+    <div class="view-strip" id="viewStrip">
+      <button class="view-btn active" data-view="organs">Organs</button>
+      <button class="view-btn" data-view="flow">Flow</button>
+      <button class="view-btn" data-view="nerves">Nerves</button>
+      <button class="view-btn" data-view="solid">Solid</button>
+      <button class="view-btn" data-view="em">EM</button>
+    </div>
+    <div class="view-caption" id="viewCaption">acoustic resonance through tissue &amp; cavity</div>
+    <div class="drive-chips" id="driveChips"></div>
+    <div class="audio-panel">
+      <div class="row">
+        <button class="audio-btn" id="listen" title="Drive internal source from microphone (on-device FFT)"><span class="lbl">LISTEN</span>● MIC</button>
+      </div>
+      <div class="audio-meta" id="audioMeta">no mic · slider controls drive</div>
+    </div>
+  </main>
+
+  <aside>
+    <h2>Resonant structures</h2>
+    <div id="zones"></div>
+
+    <div class="panel breath-panel">
+      <h2>Breath · autonomic rhythm</h2>
+      <p class="breath-caveat">
+        <em>Three rhythms: heartbeat (~1 Hz), breath (~0.2 Hz, modulates), vagus (couples).</em>
+      </p>
+      <div class="song-controls">
+        <button id="breathToggle" class="toggle small on">BREATH</button>
+        <button id="breathMode" class="toggle small">MODE · SYNTH</button>
+      </div>
+      <div class="song-row">
+        <span class="song-label">PERIOD</span>
+        <input type="range" id="breathPeriod" min="3" max="8" step="0.5" value="5">
+        <span class="song-pct" id="breathPeriodVal">5.0s</span>
+      </div>
+      <div class="breath-meter">
+        <div class="breath-bar" id="breathBar"></div>
+        <div class="breath-tick"></div>
+      </div>
+    </div>
+
+    <div class="panel song-panel">
+      <h2>Song · external source</h2>
+      <p class="song-caveat" title="A song reaches the body via air pressure at both ears. The skull-top entry point shown here is a visualization choice that makes the interference geometry legible — internal source rises from the larynx, external descends from above, the meeting region falls inside the zone array. NOT acoustics.">
+        <em>Source position is artistic, not anatomical.</em>
+        <span class="info-dot">ⓘ</span>
+      </p>
+      <input type="file" id="songFile" accept="audio/*" class="file-input">
+      <label for="songFile" class="file-label">Choose audio file</label>
+      <div class="song-controls">
+        <button id="songPlay" class="toggle small" disabled>▶ PLAY</button>
+        <button id="songStop" class="toggle small" disabled>■ STOP</button>
+        <button id="fieldToggle" class="toggle small on" title="Toggle the two-source interference field rendering. With external source amplitude at zero, the field collapses to a no-op.">FIELD</button>
+      </div>
+      <div class="song-row">
+        <span class="song-label">EXT BAL</span>
+        <input type="range" id="songBalance" min="0" max="1" step="0.05" value="0.7">
+        <span class="song-pct" id="songBalanceVal">70%</span>
+      </div>
+      <div class="song-row">
+        <span class="song-label">PEAKS K</span>
+        <input type="range" id="songK" min="1" max="5" step="1" value="1">
+        <span class="song-pct" id="songKVal">1</span>
+      </div>
+      <div class="song-status" id="songStatus">No song loaded.</div>
+    </div>
+
+    <div class="panel tools-panel">
+      <h2>Research tools</h2>
+      <p class="panel-note"><em>Opt-in.</em> Export feeds the offline graph engine and journal-noticer. No raw audio leaves the device.</p>
+      <button id="exportSession" class="toggle small">EXPORT SESSION</button>
+    </div>
+
+    <div class="panel">
+      <h2>What you're looking at</h2>
+      <p><em>Driver:</em> the vocal folds (the flaps in the larynx) chop the airstream into a buzz at the fundamental frequency. That buzz is rich in harmonics.</p>
+      <p><em>Resonators:</em> each cavity and bony structure has its own preferred frequency. They respond strongly when the fundamental — or one of its harmonics — lands near their natural mode.</p>
+      <p><em>Coupling:</em> the vagus nerve (green path winding through the chest) and the body's tissues mechanically and neurologically link these zones. Even sub-threshold vibration in one zone biases the others — the <em>"tuning"</em> case.</p>
+      <p><em>Whole-system mode:</em> at certain fundamentals, multiple resonators light up simultaneously through harmonic stacking. That's the singer's experience of the note "ringing through everything."</p>
+      <p><em>Anti-resonance:</em> at the geometric mean between adjacent zone pairs (the ◊-marked buttons on the left), coupled oscillators interfere destructively. Response drops <em>below</em> baseline — not silence, but active cancellation.</p>
+    </div>
+  </aside>
+
+  <footer>
+    <div class="freq-readout">
+      <span id="freqVal">220</span><span class="unit">Hz</span>
+      <span class="note" id="noteName">A3</span>
+    </div>
+    <input type="range" id="freq" min="70" max="3000" value="220" step="1">
+    <div class="presets">
+      <button class="preset-btn" data-f="98">CHEST · 98</button>
+      <button class="preset-btn" data-f="220">A3 · 220</button>
+      <button class="preset-btn" data-f="440">A4 · 440</button>
+      <button class="preset-btn" data-f="587">SKULL · 587</button>
+      <button class="preset-btn" data-f="261.6">SWEET · 262</button>
+      <button class="preset-btn heart-btn" data-f="105">♥ HEART · 105</button>
+      <button class="preset-btn" data-f="2800">SINGER · 2800</button>
+    </div>
+    <button class="speed-btn" id="speed"><span class="lbl">RATE</span>1×</button>
+    <button class="env-btn" id="env"><span class="lbl">ENV</span>NONE</button>
+    <button class="multi-toggle" id="multi" title="Pin multiple drive frequencies">MULTI</button>
+    <button class="clear-btn" id="clearPins" title="Clear pinned drives">×</button>
+    <button class="toggle" id="sweep">SWEEP</button>
+  </footer>
+
+</div>
+
+<script type="module" src="src/main.js"></script>
+</body>
+</html>

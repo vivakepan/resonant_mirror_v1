@@ -1,0 +1,26 @@
+{
+  "name": "resonant-mirror",
+  "version": "2.0.0-phase0",
+  "description": "Resonant Mirror v2 — local-first vocal observation with evidence-labeled analysis, built on the Resonant Singer prototype.",
+  "type": "module",
+  "scripts": {
+    "start": "npx http-server -p 8000 -c-1",
+    "serve": "python3 -m http.server 8000",
+    "verify": "bash tools/verify_all.sh",
+    "verify:physics": "node tools/physics_verify.js",
+    "verify:dynamics": "node tools/dynamics_verify.js",
+    "verify:v2": "node --test tests/v2/*.test.js",
+    "build:dist": "node tools/build_portable.mjs"
+  },
+  "keywords": [
+    "resonance",
+    "acoustics",
+    "coupled-oscillators",
+    "visualization",
+    "voice",
+    "canvas",
+    "interactive"
+  ],
+  "author": "Vivake Pandey",
+  "license": "MIT"
+}

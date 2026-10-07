@@ -757,20 +757,37 @@ describe('Phase 3 — anatomy contracts', () => {
     assert.ok(pose.humming.active);
     assert.ok(pose.mouthOpen < 0.1);
     assert.ok(pose.velumOpen > 0.7);
-    const plan = anatomyDrawPlan([], {
+    const humFeatures = {
+      fundamentalFrequencyHertz: 180,
+      pitchConfidence: 0.72,
+      periodicity: 0.82,
+      rmsAmplitude: 0.08,
+      spectralCentroidHertz: 1200,
+      harmonicity: 0.7,
+      formantsHertz: [280, 1100, 2400],
+    };
+    const humFrame = resolveVisualState({
+      visualName: 'hummingCandidate',
+      timestampSeconds: 1,
+      value: 0.7,
+      evidenceClass: 'inferred',
+      observedAtSeconds: 1,
+      confidence: 0.7,
+    });
+    const pitchForHum = resolveVisualState({
+      visualName: 'actualPitchLayer',
+      timestampSeconds: 1,
+      value: 180,
+      evidenceClass: 'derived',
+      observedAtSeconds: 1,
+    });
+    const plan = anatomyDrawPlan([humFrame, pitchForHum], {
       pose: snapshotPoseForClass('phonated_exhale'),
       showRespiratory: true,
-      features: {
-        fundamentalFrequencyHertz: 180,
-        pitchConfidence: 0.72,
-        periodicity: 0.82,
-        rmsAmplitude: 0.08,
-        spectralCentroidHertz: 1200,
-        harmonicity: 0.7,
-        formantsHertz: [280, 1100, 2400],
-      },
+      features: humFeatures,
     });
     assert.ok(plan.humming.active);
+    assert.equal(plan.humming.evidenceClass, 'inferred');
     assert.ok(plan.structureVibration.skullRim > 0.3, 'humming vibrates the skull');
     assert.ok(plan.simulatedBreath.pose.nasalShare > 0.7);
   });

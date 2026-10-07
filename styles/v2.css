@@ -1,5 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,500;1,400&family=JetBrains+Mono:wght@300;400;500&display=swap');
-
+/* Local-first: no remote font CDN. Prefer installed faces, then distinctive fallbacks. */
 :root {
   --bg: #07090c;
   --panel: #0d1218;
@@ -8,6 +7,8 @@
   --line: #1c252e;
   --warm: #ff7a3c;
   --teal: #4fd6c4;
+  --font-mono: 'JetBrains Mono', 'SF Mono', 'Cascadia Code', 'Fira Code', ui-monospace, Menlo, Consolas, monospace;
+  --font-display: 'Cormorant Garamond', 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif;
 }
 
 * { box-sizing: border-box; }
@@ -15,10 +16,10 @@ html, body {
   margin: 0;
   background: var(--bg);
   color: var(--ink);
-  font-family: 'JetBrains Mono', monospace;
+  font-family: var(--font-mono);
 }
 body { min-height: 100%; }
-h1, h2 { font-family: 'Cormorant Garamond', serif; font-weight: 400; margin: 0 0 0.4rem; }
+h1, h2 { font-family: var(--font-display); font-weight: 400; margin: 0 0 0.4rem; }
 h1 { font-size: 1.55rem; margin: 0; }
 h1 em { color: var(--teal); font-style: italic; }
 h2 { font-size: 1rem; color: #c5d0da; }

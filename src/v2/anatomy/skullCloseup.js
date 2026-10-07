@@ -298,7 +298,10 @@ export function skullCloseupState(frame = null, plan = null) {
     pharynxWide: tract.evidenceClass === 'derived' ? tract.pharynxWide : 0.45,
     pitchColor: frequencyHertz > 0 ? frequencyToColor(frequencyHertz) : '#9ad7ff',
     vowelMap,
-    humming: art.humming || inferHumming(frame?.features || {}, { mouthOpen, nasalShare }),
+    humming: frame?.inferences?.humming
+      || plan?.humming
+      || art.humming
+      || inferHumming(frame?.features || {}, { mouthOpen, nasalShare }),
     mixedVibration: mixedSystemVibration({
       mixedAmount,
       rmsAmplitude: rmsSafe,
@@ -310,7 +313,12 @@ export function skullCloseupState(frame = null, plan = null) {
       chestAmount,
       mixedAmount,
       headAmount,
-      hummingAmount: (art.humming || inferHumming(frame?.features || {}, { mouthOpen, nasalShare })).amount,
+      hummingAmount: (
+        frame?.inferences?.humming
+        || plan?.humming
+        || art.humming
+        || inferHumming(frame?.features || {}, { mouthOpen, nasalShare })
+      ).amount,
       rmsAmplitude: rmsSafe,
       energy,
       frequencyHertz,

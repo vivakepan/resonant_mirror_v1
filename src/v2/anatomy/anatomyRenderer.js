@@ -45,8 +45,6 @@ import {
   structureVibrationFromVoice,
   rgbaVoice,
 } from './registerColors.js';
-import { inferHumming } from '../resonance/humming.js';
-
 export const FIGURE_ZOOM_RANGE = Object.freeze({ min: 0.48, max: 1.55 });
 
 export function nextFigureZoom(current, deltaY) {
@@ -844,10 +842,23 @@ export function anatomyDrawPlan(visualStates, {
     if (!(resolvedPose.flowRate > 0.04) && direction !== 0) resolvedPose.flowRate = 0.7;
   }
 
-  const humming = inferHumming(features, {
-    mouthOpen: resolvedPose.mouthOpen,
-    nasalShare: resolvedPose.nasalShare,
-  });
+  // Humming must arrive as a provenance-tagged visual state (composeVisuals).
+  // The renderer does not invent humming from raw features.
+  const hummingVisual = states.get('hummingCandidate');
+  const hummingAmount = assertiveness(hummingVisual);
+  const humming = hummingAmount > 0.42
+    ? {
+      amount: hummingAmount,
+      active: true,
+      evidenceClass: 'inferred',
+      label: 'humming candidate · closed-lip voiced nasal, inferred — not lip tracking',
+    }
+    : {
+      amount: 0,
+      active: false,
+      evidenceClass: 'unknown',
+      label: 'no humming evidence',
+    };
   if (showRespiratory && humming.active) {
     resolvedPose.nasalShare = Math.max(resolvedPose.nasalShare || 0, 0.78);
     resolvedPose.mouthOpen = Math.min(resolvedPose.mouthOpen || 0.12, 0.08);

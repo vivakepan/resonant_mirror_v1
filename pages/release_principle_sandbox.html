@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Release Principle sandbox — exploratory · not a body measurement</title>
+  <style>
+    :root {
+      --ink: #0b0d10;
+      --text: rgba(232, 238, 245, 0.9);
+      --dim: rgba(232, 238, 245, 0.42);
+      --line: rgba(255, 255, 255, 0.1);
+      --chest: #e8813f;
+      --head: #4fd0e0;
+      --barrier: #b45cc4;
+      --warn: #e04f4f;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--ink);
+      color: var(--text);
+      font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+    header, main, footer { padding: 1.25rem 1.5rem; }
+    header {
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+      justify-content: space-between;
+      align-items: flex-end;
+    }
+    h1 {
+      margin: 0;
+      font-family: Georgia, 'Iowan Old Style', Palatino, serif;
+      font-weight: 500;
+      font-size: 1.55rem;
+    }
+    h1 em { color: var(--dim); font-weight: 400; }
+    .badge {
+      color: var(--warn);
+      border: 1px solid rgba(224, 79, 79, 0.45);
+      padding: 0.45rem 0.65rem;
+      border-radius: 4px;
+      max-width: 22rem;
+      font-size: 11px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+      gap: 1.25rem;
+    }
+    @media (max-width: 860px) { .grid { grid-template-columns: 1fr; } }
+    canvas {
+      width: 100%;
+      height: auto;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #07090c;
+      display: block;
+    }
+    .panel {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 1rem;
+    }
+    h2 {
+      margin: 0 0 0.65rem;
+      font-family: Georgia, Palatino, serif;
+      font-size: 1.05rem;
+      font-weight: 500;
+    }
+    .dim { color: var(--dim); }
+    label { display: block; margin: 0.75rem 0 0.25rem; color: var(--dim); font-size: 11px; }
+    input[type="range"] { width: 100%; }
+    .row { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.85rem; }
+    button {
+      background: transparent;
+      color: var(--text);
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      padding: 0.4rem 0.7rem;
+      cursor: pointer;
+      font: inherit;
+    }
+    button:hover { border-color: rgba(255,255,255,0.28); }
+    ul { margin: 0.4rem 0 0; padding-left: 1.1rem; color: var(--dim); }
+    li { margin: 0.35rem 0; }
+    footer {
+      border-top: 1px solid var(--line);
+      color: var(--dim);
+      font-size: 11px;
+    }
+    a { color: var(--head); }
+    .swatch { display: inline-block; width: 0.7rem; height: 0.7rem; border-radius: 2px; margin-right: 0.3rem; vertical-align: -1px; }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>Release Principle <em>sandbox</em></h1>
+      <p class="dim" style="margin:0.4rem 0 0">Exploratory register-transition sketch · REQ-095</p>
+    </div>
+    <p class="badge">
+      Pedagogical hypothesis only. Thresholds here MUST NOT measure a singer’s body
+      and MUST NOT drive Resonant Mirror v2 feedback.
+    </p>
+  </header>
+
+  <main class="grid">
+    <section>
+      <canvas id="plot" width="720" height="420" aria-label="Illustrative hysteresis curve between chest-like and head-like poles"></canvas>
+      <p class="dim" style="margin-top:0.65rem">
+        Drag the control below. Upward and downward paths differ on purpose — that difference is the
+        illustrative “hysteresis / barrier,” not a validated physiological threshold.
+      </p>
+    </section>
+
+    <aside class="panel">
+      <h2>What this is</h2>
+      <p class="dim">
+        A restored exploratory artifact for the “Release Principle” teaching sketch:
+        chest-dominant ↔ head-dominant movement may feel sticky, then suddenly freer.
+        v2 observes registration as an <strong>inferred research target</strong>; this page stays isolated.
+      </p>
+
+      <label for="drive">Illustrative drive (not pitch, not effort)</label>
+      <input id="drive" type="range" min="0" max="1000" value="220">
+      <div class="row">
+        <button id="reset" type="button">Reset path</button>
+        <button id="ascend" type="button">Animate up</button>
+        <button id="descend" type="button">Animate down</button>
+      </div>
+
+      <h2 style="margin-top:1.25rem">Falsification notes</h2>
+      <ul>
+        <li>If a singer’s path is smooth both ways, the barrier picture is wrong for them.</li>
+        <li>If low pitch always “is chest,” the sketch collapses into the prohibited pitch→region shortcut.</li>
+        <li>If this page’s numbers appear in v2 glow logic, that is a contract failure — report it.</li>
+        <li>Comfort / ease reports can disagree with the curve; singer report wins for personal meaning.</li>
+      </ul>
+
+      <h2 style="margin-top:1.25rem">Legend</h2>
+      <p><span class="swatch" style="background:var(--chest)"></span>chest-like pole</p>
+      <p><span class="swatch" style="background:var(--head)"></span>head-like pole</p>
+      <p><span class="swatch" style="background:var(--barrier)"></span>illustrative barrier band</p>
+    </aside>
+  </main>
+
+  <footer>
+    Separate from <a href="../index.html">Resonant Mirror v2</a>.
+    Legacy coupled-oscillator pages were removed; this sandbox keeps the pedagogical idea without
+    feeding anatomy glow, breath, or tension estimators.
+  </footer>
+
+  <script type="module">
+    /**
+     * Tiny illustrative hysteresis — deliberately not imported by v2.
+     * Ascending and descending paths use different midpoints so the “barrier”
+     * is visible as a teaching cartoon.
+     */
+    const canvas = document.getElementById('plot');
+    const ctx = canvas.getContext('2d');
+    const drive = document.getElementById('drive');
+    let path = [];
+    let direction = 1;
+    let anim = null;
+
+    function chestToHead(t, ascending) {
+      // Smoothstep with offset midpoint — cartoon hysteresis, not a body model.
+      const mid = ascending ? 0.62 : 0.38;
+      const k = 14;
+      const x = 1 / (1 + Math.exp(-k * (t - mid)));
+      return x;
+    }
+
+    function draw() {
+      const W = canvas.width;
+      const H = canvas.height;
+      ctx.clearRect(0, 0, W, H);
+      ctx.fillStyle = '#07090c';
+      ctx.fillRect(0, 0, W, H);
+
+      const pad = 48;
+      const plotW = W - pad * 2;
+      const plotH = H - pad * 2;
+
+      // Barrier band
+      ctx.fillStyle = 'rgba(180, 92, 196, 0.12)';
+      ctx.fillRect(pad + plotW * 0.35, pad, plotW * 0.3, plotH);
+
+      // Axes
+      ctx.strokeStyle = 'rgba(232,238,245,0.22)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(pad, pad);
+      ctx.lineTo(pad, pad + plotH);
+      ctx.lineTo(pad + plotW, pad + plotH);
+      ctx.stroke();
+
+      ctx.fillStyle = 'rgba(232,238,245,0.45)';
+      ctx.font = '12px ui-monospace, monospace';
+      ctx.fillText('chest-like', pad, pad + plotH + 28);
+      ctx.fillText('head-like', pad + plotW - 70, pad + plotH + 28);
+      ctx.save();
+      ctx.translate(18, pad + plotH / 2);
+      ctx.rotate(-Math.PI / 2);
+      ctx.fillText('coordination sketch →', 0, 0);
+      ctx.restore();
+
+      // Reference curves
+      for (const ascending of [true, false]) {
+        ctx.strokeStyle = ascending ? 'rgba(232,129,63,0.55)' : 'rgba(79,208,224,0.55)';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        for (let i = 0; i <= 100; i++) {
+          const t = i / 100;
+          const y = chestToHead(t, ascending);
+          const x = pad + t * plotW;
+          const py = pad + plotH - y * plotH;
+          if (i === 0) ctx.moveTo(x, py);
+          else ctx.lineTo(x, py);
+        }
+        ctx.stroke();
+      }
+
+      // User path
+      if (path.length > 1) {
+        ctx.strokeStyle = 'rgba(255,255,255,0.75)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        path.forEach((p, i) => {
+          const x = pad + p.t * plotW;
+          const py = pad + plotH - p.y * plotH;
+          if (i === 0) ctx.moveTo(x, py);
+          else ctx.lineTo(x, py);
+        });
+        ctx.stroke();
+      }
+
+      const t = Number(drive.value) / 1000;
+      const y = chestToHead(t, direction >= 0);
+      const x = pad + t * plotW;
+      const py = pad + plotH - y * plotH;
+      ctx.fillStyle = '#fff';
+      ctx.beginPath();
+      ctx.arc(x, py, 5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = 'rgba(232,238,245,0.7)';
+      ctx.fillText(`drive ${t.toFixed(2)} · state ${y.toFixed(2)} · ${direction >= 0 ? 'ascending' : 'descending'}`, pad, 28);
+    }
+
+    let lastT = Number(drive.value) / 1000;
+    drive.addEventListener('input', () => {
+      const t = Number(drive.value) / 1000;
+      direction = t >= lastT ? 1 : -1;
+      lastT = t;
+      const y = chestToHead(t, direction >= 0);
+      path.push({ t, y });
+      if (path.length > 240) path.shift();
+      draw();
+    });
+
+    document.getElementById('reset').addEventListener('click', () => {
+      path = [];
+      drive.value = 220;
+      lastT = 0.22;
+      direction = 1;
+      draw();
+    });
+
+    function animateToward(target) {
+      if (anim) cancelAnimationFrame(anim);
+      const step = () => {
+        const cur = Number(drive.value);
+        const next = cur + Math.sign(target - cur) * 8;
+        if ((target > cur && next >= target) || (target < cur && next <= target) || cur === target) {
+          drive.value = target;
+          drive.dispatchEvent(new Event('input'));
+          anim = null;
+          return;
+        }
+        drive.value = next;
+        drive.dispatchEvent(new Event('input'));
+        anim = requestAnimationFrame(step);
+      };
+      anim = requestAnimationFrame(step);
+    }
+    document.getElementById('ascend').addEventListener('click', () => animateToward(920));
+    document.getElementById('descend').addEventListener('click', () => animateToward(80));
+
+    draw();
+  </script>
+</body>
+</html>

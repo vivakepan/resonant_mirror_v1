@@ -43,7 +43,9 @@ Practical differences from the original spec text:
 - **Register glow:** chest, mixed, and head do not light at once from leftover probability. The winning class lights; a transition may light the from/to pair. Head-voice blue sits on the brainstem. Throat resonance sits at the top of the neck / cervical spine.
 - **Felt vibration:** head and mixed shake the skull rim. Chest and mixed shake ribs, sternum, spine, and laryngeal cartilage. Skull-rim and ribcage vibration is a razor-thin mint line matching breath, to mark breath control for register. The airway is outlined in hot rose from the xiphoid to the top of the spine; the voice box is indigo so it stays readable. A closed-lip humming candidate (inferred) couples vibration into the skull and nasal path. This is not a claim that the skeleton is a resonator.
 
-Hard-refresh so `index.html` loads `main.js?v=breath-line-1`.
+Hard-refresh so `index.html` loads `main.js?v=spec-audit-1`.
+
+Exploratory (not v2 feedback): [`pages/release_principle_sandbox.html`](pages/release_principle_sandbox.html) — Release Principle teaching sketch (REQ-095).
 
 ### Plain-language terminology
 

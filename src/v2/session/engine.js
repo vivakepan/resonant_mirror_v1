@@ -25,7 +25,8 @@ export class ObservationEngine {
     this.resonance = new ResonanceAnalyzer();
     this.userBreath = new RespirationEstimator({ source: 'user' });
     this.referenceBreath = new RespirationEstimator({ source: 'reference' });
-    this.registration = new RegistrationEstimator();
+    this.userRegistration = new RegistrationEstimator();
+    this.referenceRegistration = new RegistrationEstimator();
     this.tension = new TensionEstimator();
     this.support = new SupportEstimator();
     this.frames = [];
@@ -34,7 +35,11 @@ export class ObservationEngine {
       startedAt: new Date().toISOString(),
       inputMode: 'microphone',
       captureSettings: captureSettingsRecord(),
-      modelVersions: { vocalEncoder: null, respiration: 'respiration-heuristic-1' },
+      modelVersions: {
+        vocalEncoder: null,
+        respiration: 'respiration-heuristic-1',
+        registration: 'registration-heuristic-2',
+      },
     });
   }
 
@@ -47,10 +52,12 @@ export class ObservationEngine {
       sampleRate: packet.sampleRate,
     });
     this.resonance.analyzeFrame(frame, packet.samples, packet.sampleRate);
-    if (packet.source === 'reference') this.referenceBreath.infer(frame);
-    else this.userBreath.infer(frame);
-    if (packet.source === 'user') {
-      this.registration.infer(frame);
+    if (packet.source === 'reference') {
+      this.referenceBreath.infer(frame);
+      this.referenceRegistration.infer(frame);
+    } else {
+      this.userBreath.infer(frame);
+      this.userRegistration.infer(frame);
       this.tension.infer(frame, extras);
       this.support.infer(frame, extras);
     }

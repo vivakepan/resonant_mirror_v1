@@ -8,6 +8,7 @@ import { simulatedAirflow } from '../respiration/estimator.js';
 import { snapshotPoseForClass } from '../anatomy/breathKinematics.js';
 import { defaultFeatureFlags } from '../contracts/featureFlags.js';
 import { registerGlowFromInference } from '../registration/estimator.js';
+import { inferHumming } from '../resonance/humming.js';
 
 export function composeVisualStates(frame, {
   flags = defaultFeatureFlags(),
@@ -168,6 +169,22 @@ export function composeVisualStates(frame, {
     evidenceClass: supportOk ? (support.evidenceClass || 'inferred') : 'unknown',
     observedAtSeconds: timestampSeconds,
     reliabilityOk: supportOk,
+  }));
+
+  // Humming is composed here so the renderer cannot invent it from raw features.
+  const humming = inf.humming?.evidenceClass
+    ? inf.humming
+    : inferHumming(f);
+  if (!inf.humming) frame.inferences.humming = humming;
+  const hummingOk = humming.active && humming.amount > 0.42;
+  visuals.push(resolveVisualState({
+    visualName: 'hummingCandidate',
+    timestampSeconds,
+    value: hummingOk ? humming.amount : null,
+    evidenceClass: hummingOk ? 'inferred' : 'unknown',
+    confidence: hummingOk ? humming.amount : 0,
+    observedAtSeconds: timestampSeconds,
+    reliabilityOk: hummingOk,
   }));
 
   return visuals;

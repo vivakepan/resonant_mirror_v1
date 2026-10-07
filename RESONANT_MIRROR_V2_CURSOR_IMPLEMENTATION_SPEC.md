@@ -2898,7 +2898,7 @@ The implementation is successful when the system becomes increasingly informativ
 
 ---
 
-# 40. Current repository implementation ledger (17 Aug 2026)
+# 40. Current repository implementation ledger (7 Oct 2026)
 
 This ledger records what the running browser app does relative to this specification. It is not a substitute for held-out validation gates.
 
@@ -2910,6 +2910,8 @@ This ledger records what the running browser app does relative to this specifica
 - Anatomy v2: realistic figure, transparency, simulated diaphragm/ribs, inferred chest/mixed/head mappings, formant-gated tract chambers.
 - Respiratory events as inferred classes with smoothing, simulated airflow, event records. Assertive visuals remain off until held-out validation.
 - Registration probabilities and tension-evidence glow with inspector/stale behavior.
+- Registration is timbre-led (`registration-heuristic-2`): absolute F0 bands alone MUST NOT light chest or skull. Humming arrives as a provenance-tagged `hummingCandidate` visual state. Singer vs reference registration classes are shown side by side when both streams are active; the figure still follows the microphone when it is on.
+- Exploratory Release Principle sandbox restored at `pages/release_principle_sandbox.html` (isolated; does not drive v2). UI fonts are local-first (no Google Fonts CDN).
 
 ## Altered from the original spec text
 
@@ -2932,7 +2934,16 @@ This ledger records what the running browser app does relative to this specifica
 - Practice piano and metronome in the observation UI.
 - Support-evidence overlay remains optional and is not a `SUPPORTED` classifier.
 
-## Not implemented (Phases 7–12)
+## Phases 7–12 — offline / library status (not live-trusted)
 
-Dataset encoder, expressive-intensity ranker, personal prototypes, phrase temporal model, and optional personal training. Those MUST stay offline. Live sessions MUST NOT update model weights. A future breath-phase network is pre-training plus held-out evaluation, then a frozen checkpoint — not an in-session learner.
+| Phase | In repo | In running observation UI |
+|-------|---------|---------------------------|
+| 7 Dataset + small PyTorch encoder | Partial (`ml/vocal_encoder/`, tests) | Disabled; no shipped checkpoint |
+| 8 Expressive-intensity ranking | Partial (utilities + tests) | Disabled; aura energy stays unknown |
+| 9 Personal memory | Partial (`PersonalMemory`); self-label chips store a **feature-snapshot** proxy, not a vocal-encoder embedding | No trained prototypes in the loop |
+| 10 Support-related coordination | Estimator + tests | Flag disabled; needs embeddings |
+| 11 Phrase temporal model | Helpers + tests | Unused in session engine |
+| 12 Optional personal training | Gates only | Live weight updates forbidden |
+
+Those MUST stay offline or gated. Live sessions MUST NOT update model weights. A future breath-phase network is pre-training plus held-out evaluation, then a frozen checkpoint — not an in-session learner.
 

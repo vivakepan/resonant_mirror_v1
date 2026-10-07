@@ -12,7 +12,7 @@ import {
   nextFigureZoom,
   pointHitsLarynx,
   pointHitsSkull,
-} from '../anatomy/anatomyRenderer.js?v=breath-line-1';
+} from '../anatomy/anatomyRenderer.js?v=spec-audit-1';
 import { BreathKinematics, defaultBreathDemo, REST_POSE, VoiceSyncedBreath } from '../anatomy/breathKinematics.js';
 import {
   drawVocalFoldCloseup,
@@ -20,7 +20,7 @@ import {
   foldHudSummary,
   idleVocalFoldState,
   overlayTechniqueOnLive,
-} from '../anatomy/vocalFoldState.js?v=breath-line-1';
+} from '../anatomy/vocalFoldState.js?v=spec-audit-1';
 import { renderInspectorHtml } from '../visualization/inspector.js';
 import { defaultFeatureFlags } from '../contracts/featureFlags.js';
 import { EVIDENCE_LABELS } from '../contracts/evidence.js';
@@ -33,7 +33,7 @@ import {
   nextSkullYaw,
   nextSkullZoom,
   skullCloseupState,
-} from '../anatomy/skullCloseup.js?v=breath-line-1';
+} from '../anatomy/skullCloseup.js?v=spec-audit-1';
 import { mountPracticeInstruments } from './practiceUi.js';
 import { parseSongFilename } from '../lyrics/parseFilename.js';
 import { formatVowelSensationLine } from '../resonance/vowelMap.js';
@@ -41,8 +41,35 @@ import { formatVowelSensationLine } from '../resonance/vowelMap.js';
 const flags = defaultFeatureFlags();
 const engine = new ObservationEngine({ flags });
 const audio = new DualAudioPipeline();
-const memory = new PersonalMemory();
+/** Feature-proxy memory until the vocal encoder is wired into the live loop. */
+const memory = new PersonalMemory({ embeddingVersion: 'feature-snapshot-1' });
 const pitchAccuracy = new PitchAccuracyTracker();
+
+function featureProxyEmbedding(features = {}) {
+  const f0 = Number(features.fundamentalFrequencyHertz) || 0;
+  const rms = Number(features.rmsAmplitude) || 0;
+  const centroid = Number(features.spectralCentroidHertz) || 0;
+  const tilt = Number(features.spectralTilt) || 0;
+  const periodicity = Number(features.periodicity) || 0;
+  const harm = Number(features.harmonicity) || 0;
+  const f1 = Number(features.formantsHertz?.[0]) || 0;
+  const f2 = Number(features.formantsHertz?.[1]) || 0;
+  return [
+    Math.min(1, f0 / 600),
+    Math.min(1, rms * 4),
+    Math.min(1, centroid / 4000),
+    Math.max(-1, Math.min(1, tilt / 2)) * 0.5 + 0.5,
+    Math.min(1, periodicity),
+    Math.min(1, harm),
+    Math.min(1, f1 / 1000),
+    Math.min(1, f2 / 3000),
+  ];
+}
+
+function formatRegisterClass(reg) {
+  if (!reg || reg.class === 'unknown') return 'unknown';
+  return `${reg.class.replaceAll('_', ' ')} (${Math.round((reg.confidence || 0) * 100)}%)`;
+}
 
 const canvas = document.getElementById('anatomy');
 const ctx = canvas.getContext('2d');
@@ -162,7 +189,23 @@ for (const label of SELF_TENSION_LABELS) {
   btn.type = 'button';
   btn.textContent = label;
   btn.className = 'chip';
-  btn.addEventListener('click', () => btn.classList.toggle('on'));
+  btn.addEventListener('click', () => {
+    const turningOn = !btn.classList.contains('on');
+    btn.classList.toggle('on');
+    if (turningOn && lastUser?.frame?.features) {
+      // Fast personal note — not a trained embedding, not a weight update.
+      memory.storeExample({
+        embedding: featureProxyEmbedding(lastUser.frame.features),
+        embeddingVersion: 'feature-snapshot-1',
+        labels: activeLabels(),
+        sessionId: engine.session.sessionId,
+        features: {
+          fundamentalFrequencyHertz: lastUser.frame.features.fundamentalFrequencyHertz,
+          relativeLevelDecibelsFullScale: lastUser.frame.features.relativeLevelDecibelsFullScale,
+        },
+      });
+    }
+  });
   labelBox.appendChild(btn);
 }
 
@@ -212,13 +255,33 @@ function frame(now) {
       const lanes = document.getElementById('lanes');
       lanes.textContent = `singer @ ${pair.user?.timestampSeconds ?? '—'}s · reference @ ${pair.reference?.timestampSeconds ?? '—'}s`;
       const reg = user.frame.inferences.registration;
-      setText('registrationReadout', reg?.class === 'unknown' || !reg
-        ? 'unknown'
-        : `${reg.class.replaceAll('_', ' ')} (${Math.round((reg.confidence || 0) * 100)}% confidence, experimental)`);
+      const refReg = lastReference?.frame?.inferences?.registration;
+      const singerReg = formatRegisterClass(reg);
+      if (audio.pipeline.referencePlaying && refReg) {
+        setText(
+          'registrationReadout',
+          `singer ${singerReg} · ref ${formatRegisterClass(refReg)} · experimental`,
+        );
+      } else {
+        setText(
+          'registrationReadout',
+          singerReg === 'unknown' ? 'unknown' : `${singerReg} · experimental`,
+        );
+      }
       const resp = user.frame.inferences.respiration;
-      setText('breathReadout', !resp || resp.class === 'unknown'
-        ? 'unknown'
-        : `${resp.class.replaceAll('_', ' ')} · anatomy simulated`);
+      const refBreath = lastReference?.frame?.inferences?.respiration;
+      if (audio.pipeline.referencePlaying && layers.lanes && refBreath) {
+        setText(
+          'breathReadout',
+          `singer ${!resp || resp.class === 'unknown' ? 'unknown' : resp.class.replaceAll('_', ' ')}`
+            + ` · ref ${refBreath.class === 'unknown' ? 'unknown' : refBreath.class.replaceAll('_', ' ')}`
+            + ' · anatomy simulated',
+        );
+      } else {
+        setText('breathReadout', !resp || resp.class === 'unknown'
+          ? 'unknown'
+          : `${resp.class.replaceAll('_', ' ')} · anatomy simulated`);
+      }
       const ten = user.frame.inferences.tensionEvidence;
       setText('tensionReadout', ten?.accessibilityCue || 'tension evidence: none');
     }

@@ -17,6 +17,7 @@ export const PROVISIONAL_MAX_AGE_SECONDS = Object.freeze({
   chestRegionGlow: 0.4,
   mixedCoordinationField: 0.4,
   registrationTransition: 0.4,
+  hummingCandidate: 0.45,
   diaphragmMotion: 0.6,
   ribMotion: 0.6,
   airflowParticles: 0.6,
@@ -81,6 +82,18 @@ export const VISUAL_CONTRACTS = Object.freeze({
     sourceFieldPaths: ['inferences.registration'],
     unknownBehavior: 'fade_to_neutral',
     notes: 'Probabilistic transition-shape candidate. The label “forced” is not used without annotation.',
+  },
+  hummingCandidate: {
+    visualName: 'hummingCandidate',
+    evidenceClass: 'inferred',
+    sourceFieldPaths: [
+      'features.fundamentalFrequencyHertz',
+      'features.formantsHertz',
+      'features.periodicity',
+      'features.rmsAmplitude',
+    ],
+    unknownBehavior: 'fade_to_neutral',
+    notes: 'Closed-lip humming candidate from acoustics. Not lip tracking and not a skeletal resonator claim.',
   },
   diaphragmMotion: {
     visualName: 'diaphragmMotion',

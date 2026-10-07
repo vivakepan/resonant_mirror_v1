@@ -1,7 +1,13 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { RegistrationEstimator, REGISTRATION_CLASSES, registerGlowFromInference } from '../../src/v2/registration/estimator.js';
+import {
+  RegistrationEstimator,
+  REGISTRATION_CLASSES,
+  REGISTRATION_MODEL_VERSION,
+  classifyRegistration,
+  registerGlowFromInference,
+} from '../../src/v2/registration/estimator.js';
 import { createVocalFrame, emptyFeatures } from '../../src/v2/contracts/schemas.js';
 import { composeVisualStates } from '../../src/v2/visualization/composeVisuals.js';
 import { defaultFeatureFlags } from '../../src/v2/contracts/featureFlags.js';
@@ -18,6 +24,7 @@ function frame(features, t = 0) {
 describe('Phase 5 — registration', () => {
   it('allows unknown and remains probabilistic', () => {
     assert.ok(REGISTRATION_CLASSES.includes('unknown'));
+    assert.equal(REGISTRATION_MODEL_VERSION, 'registration-heuristic-2');
     const est = new RegistrationEstimator();
     const unknown = est.infer(frame({ fundamentalFrequencyHertz: null, pitchConfidence: 0 }));
     assert.equal(unknown.class, 'unknown');
@@ -26,17 +33,62 @@ describe('Phase 5 — registration', () => {
       pitchConfidence: 0.8,
       spectralCentroidHertz: 900,
       spectralTilt: -1.5,
+      periodicity: 0.8,
     }, 0.2));
     assert.ok(['chest_dominant', 'mixed', 'transition', 'unknown'].includes(chest.class));
     assert.ok(chest.confidence <= 0.7);
     assert.match(chest.notes, /not a correct-register/i);
   });
 
-  it('does not light skull or chest from pitch without a registration inference', () => {
+  it('does not light skull or chest from pitch alone (prohibited shortcut)', () => {
     const f = frame({ fundamentalFrequencyHertz: 90, pitchConfidence: 0.9 });
     const visuals = composeVisualStates(f, { flags: defaultFeatureFlags() });
     assert.equal(visuals.find((v) => v.visualName === 'chestRegionGlow').evidenceClass, 'unknown');
     assert.equal(visuals.find((v) => v.visualName === 'skullRimUpperProduction').evidenceClass, 'unknown');
+
+    const lowOnly = classifyRegistration({
+      fundamentalFrequencyHertz: 120,
+      pitchConfidence: 0.95,
+    });
+    assert.equal(lowOnly.class, 'unknown', 'low F0 alone must not invent chest');
+
+    const highOnly = classifyRegistration({
+      fundamentalFrequencyHertz: 480,
+      pitchConfidence: 0.95,
+    });
+    assert.equal(highOnly.class, 'unknown', 'high F0 alone must not invent head');
+
+    const pitchOnlyFrame = frame({
+      fundamentalFrequencyHertz: 120,
+      pitchConfidence: 0.95,
+      periodicity: 0.85,
+    });
+    const est = new RegistrationEstimator();
+    est.infer(pitchOnlyFrame);
+    assert.equal(pitchOnlyFrame.inferences.registration.class, 'unknown');
+    const lit = composeVisualStates(pitchOnlyFrame, { flags: defaultFeatureFlags() });
+    assert.equal(lit.find((v) => v.visualName === 'chestRegionGlow').evidenceClass, 'unknown');
+    assert.equal(lit.find((v) => v.visualName === 'skullRimUpperProduction').evidenceClass, 'unknown');
+
+    const withTimbre = classifyRegistration({
+      fundamentalFrequencyHertz: 220,
+      pitchConfidence: 0.9,
+      spectralCentroidHertz: 780,
+      spectralTilt: -1.6,
+      periodicity: 0.85,
+    });
+    assert.ok(['chest_dominant', 'mixed', 'unknown'].includes(withTimbre.class));
+    assert.ok(withTimbre.class !== 'head_dominant');
+
+    const bright = classifyRegistration({
+      fundamentalFrequencyHertz: 220,
+      pitchConfidence: 0.9,
+      spectralCentroidHertz: 3200,
+      spectralTilt: -0.1,
+      periodicity: 0.85,
+    });
+    assert.ok(['head_dominant', 'mixed', 'unknown'].includes(bright.class));
+    assert.ok(bright.class !== 'chest_dominant');
   });
 
   it('does not treat vowel formants as chest or head register evidence', () => {
@@ -72,6 +124,24 @@ describe('Phase 5 — registration', () => {
     const mixed = visuals.find((v) => v.visualName === 'mixedCoordinationField');
     assert.equal(mixed.evidenceClass, 'unknown');
     assert.equal(visuals.find((v) => v.visualName === 'skullRimUpperProduction').evidenceClass, 'unknown');
+  });
+
+  it('emits a hummingCandidate visual from composeVisuals, not from the renderer', () => {
+    const f = frame({
+      fundamentalFrequencyHertz: 180,
+      pitchConfidence: 0.72,
+      periodicity: 0.82,
+      rmsAmplitude: 0.08,
+      spectralCentroidHertz: 1200,
+      harmonicity: 0.7,
+      formantsHertz: [280, 1100, 2400],
+    });
+    const visuals = composeVisualStates(f, { flags: defaultFeatureFlags() });
+    const hum = visuals.find((v) => v.visualName === 'hummingCandidate');
+    assert.ok(hum);
+    assert.equal(hum.evidenceClass, 'inferred');
+    assert.ok(hum.value > 0.42);
+    assert.equal(f.inferences.humming.evidenceClass, 'inferred');
   });
 
   it('does not light all three registers from leftover probability mass', () => {
